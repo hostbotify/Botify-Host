@@ -6,30 +6,30 @@ logger = logging.getLogger(__name__)
 
 class Database:
     """Database manager for MongoDB operations"""
-    
+
     def __init__(self):
         self.client = None
         self.db = None
         self._collections = {}
-    
+
     async def connect(self):
         """Connect to MongoDB"""
         try:
             self.client = AsyncIOMotorClient(Config.MONGO_URI)
             self.db = self.client.jhoommusic
-            
+
             # Test connection
             await self.client.admin.command('ping')
-            logger.info("Connected to MongoDB successfully")
-            
+            logger.info("✅ Connected to MongoDB successfully")
+
             # Initialize collections
             await self._init_collections()
             await self._create_indexes()
-            
+
         except Exception as e:
-            logger.error(f"Failed to connect to MongoDB: {e}")
+            logger.error(f"❌ Failed to connect to MongoDB: {e}")
             raise
-    
+
     async def _init_collections(self):
         """Initialize database collections"""
         collection_names = [
@@ -38,10 +38,10 @@ class Database:
             'gbanned_users', 'playlists', 'user_settings',
             'thumbnails', 'troubleshooting_logs'
         ]
-        
+
         for name in collection_names:
             self._collections[name] = self.db[name]
-    
+
     async def _create_indexes(self):
         """Create database indexes for better performance"""
         try:
@@ -55,22 +55,22 @@ class Database:
             await self._collections['user_settings'].create_index([("chat_id", 1), ("user_id", 1)])
             await self._collections['thumbnails'].create_index("key", unique=True)
             await self._collections['troubleshooting_logs'].create_index([("chat_id", 1), ("timestamp", -1)])
-            
-            logger.info("Database indexes created successfully")
+
+            logger.info("✅ Database indexes created successfully")
         except Exception as e:
-            logger.error(f"Error creating database indexes: {e}")
-    
+            logger.error(f"⚠️ Error creating database indexes: {e}")
+
     def __getattr__(self, name):
         """Allow direct access to collections"""
         if name in self._collections:
             return self._collections[name]
         raise AttributeError(f"Collection '{name}' not found")
-    
+
     async def close(self):
         """Close database connection"""
         if self.client:
             self.client.close()
-            logger.info("Database connection closed")
+            logger.info("🔒 Database connection closed")
 
 # Global database instance
 db = Database()
