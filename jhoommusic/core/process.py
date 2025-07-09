@@ -21,7 +21,6 @@ class ProcessManager:
         """Dynamically adjust process count based on system load"""
         async with self.lock:
             try:
-                # Get system load average (Unix-like systems only)
                 load = os.getloadavg()[0] if hasattr(os, 'getloadavg') else 1.0
             except:
                 load = 1.0
@@ -29,14 +28,14 @@ class ProcessManager:
             # Adjust based on load
             if load > 2.0 and self.max_processes > 2:
                 new_max = max(2, self.max_processes - 1)
-                logger.info(f"High load detected. Reducing processes: {self.max_processes} -> {new_max}")
+                logger.info(f"⚠️ High load detected. Reducing processes: {self.max_processes} → {new_max}")
                 self.max_processes = new_max
             elif load < 1.0 and self.max_processes < Config.FFMPEG_PROCESSES:
                 new_max = min(Config.FFMPEG_PROCESSES, self.max_processes + 1)
-                logger.info(f"Low load detected. Increasing processes: {self.max_processes} -> {new_max}")
+                logger.info(f"✅ Low load detected. Increasing processes: {self.max_processes} → {new_max}")
                 self.max_processes = new_max
             
-            # Update executor if needed
+            # NOTE: Modifying _max_workers directly (not recommended but works)
             if self.executor._max_workers != self.max_processes:
                 self.executor._max_workers = self.max_processes
     
@@ -51,14 +50,14 @@ class ProcessManager:
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
             'options': '-vn' if not is_video else ''
         }
-        
-        # Adjust buffer size based on chat type
-        if chat_id < 0:  # Group chat
+
+        # Adjust buffer size
+        if chat_id < 0:  # Group
             base_options['options'] += ' -bufsize 1024k'
-        else:  # Private chat
+        else:  # Private
             base_options['options'] += ' -bufsize 512k'
-        
-        # Set thread count
+
+        # Threads per process (limit to 8)
         base_options['options'] += f' -threads {min(self.max_processes, 8)}'
         
         return base_options
@@ -67,7 +66,7 @@ class ProcessManager:
         """Cleanup resources"""
         if self.executor:
             self.executor.shutdown(wait=True)
-            logger.info("Process manager cleaned up")
+            logger.info("✅ Process manager cleaned up")
 
 # Global process manager instance
 process_manager = ProcessManager()
