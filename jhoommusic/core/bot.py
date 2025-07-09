@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Validate configuration
 if not Config.validate():
-    logger.error("Configuration validation failed. Exiting...")
+    logger.error("❌ Configuration validation failed. Exiting...")
     exit(1)
 
 # Initialize Pyrogram client
@@ -32,4 +32,4 @@ app = Client(
 # Initialize PyTgCalls
 pytgcalls = PyTgCalls(app)
 
-logger.info("Bot and PyTgCalls initialized successfully")
+logger.info("✅ Bot and PyTgCalls initialized successfully")
