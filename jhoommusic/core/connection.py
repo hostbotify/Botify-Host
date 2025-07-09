@@ -2,8 +2,8 @@ import asyncio
 import logging
 from typing import Dict
 
-from pytgcalls.types.input_streams import AudioPiped
-from pytgcalls.types.input_streams.quality import HighQualityAudio
+from pytgcalls.types.stream import AudioPiped
+from pytgcalls.types.stream.quality import HighQualityAudio
 from pytgcalls.exceptions import NoActiveGroupCall
 
 from .bot import pytgcalls
