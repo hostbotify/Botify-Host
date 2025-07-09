@@ -1,4 +1,4 @@
-# 🎵 Jhoom Music Bot
+# 🎵 JhoomMusic Bot
 
 An advanced Telegram music bot with high-quality streaming, multi-platform support, and self-repair capabilities.
 
@@ -27,8 +27,8 @@ An advanced Telegram music bot with high-quality streaming, multi-platform suppo
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/jhoom-music-bot.git
-cd jhoom-music-bot
+git clone https://github.com/yourusername/jhoommusic-bot.git
+cd jhoommusic-bot
 ```
 
 2. **Install dependencies**
@@ -121,7 +121,7 @@ MAX_QUEUE_SIZE=50
 
 ### Core Components
 
-- **Bot Core** (`_music/core/`): Main bot functionality
+- **Bot Core** (`jhoommusic/core/`): Main bot functionality
   - `bot.py` - Pyrogram client and PyTgCalls initialization
   - `config.py` - Configuration management
   - `database.py` - MongoDB operations
@@ -132,11 +132,11 @@ MAX_QUEUE_SIZE=50
   - `thumbnail.py` - Thumbnail generation
   - `troubleshoot.py` - Self-repair system
 
-- **Plugins** (`_music/plugins/`): Command and callback handlers
+- **Plugins** (`jhoommusic/plugins/`): Command and callback handlers
   - `commands/` - Command handlers
   - `callbacks/` - Callback query handlers
 
-- **Utils** (`_music/utils/`): Utility functions
+- **Utils** (`jhoommusic/utils/`): Utility functions
   - `helpers.py` - Helper functions
   - `cache.py` - Redis caching
   - `ui.py` - UI generation
@@ -202,7 +202,7 @@ CMD ["python", "main.py"]
 
 ```ini
 [Unit]
-Description=Jhoom Music Bot
+Description=JhoomMusic Bot
 After=network.target
 
 [Service]
@@ -232,7 +232,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Telegram Support**: [@JhoomMusicSupport](https://t.me/JhoomMusicSupport)
 - **Updates Channel**: [@JhoomMusicUpdates](https://t.me/JhoomMusicUpdates)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/jhoom-music-bot/issues)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/jhoommusic-bot/issues)
 
 ## 🙏 Acknowledgments
 
@@ -243,4 +243,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by Jhoom Music Team**
+**Made with ❤️ by JhoomMusic Team**

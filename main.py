@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Jhoom Music Bot - Advanced Telegram Music Bot
-Copyright (c) 2025 Jhoom Music. All rights reserved.
+JhoomMusic Bot - Advanced Telegram Music Bot
+Copyright (c) 2025 JhoomMusic. All rights reserved.
 
 Main entry point for the bot.
 """
@@ -10,11 +10,11 @@ import asyncio
 import logging
 import signal
 import sys
-from _music.core.bot import app, pytgcalls
-from _music.core.database import db
-from _music.core.config import Config
-from _music.core.troubleshoot import troubleshoot_manager
-from _music.constants.images import UI_IMAGES
+from jhoommusic.core.bot import app, pytgcalls
+from jhoommusic.core.database import db
+from jhoommusic.core.config import Config
+from jhoommusic.core.troubleshoot import troubleshoot_manager
+from jhoommusic.constants.images import UI_IMAGES
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 async def startup():
     """Bot startup tasks"""
     try:
-        logger.info("🎵 Starting Jhoom Music Bot...")
+        logger.info("🎵 Starting JhoomMusic Bot...")
         
         # Connect to database
         await db.connect()
@@ -46,7 +46,7 @@ async def startup():
             await app.send_photo(
                 Config.SUPER_GROUP_ID,
                 UI_IMAGES["startup"],
-                caption="⚡ **Jhoom Music Bot is now online!**\n"
+                caption="⚡ **JhoomMusic Bot is now online!**\n"
                 f"**Version:** 1.0\n"
                 f"**Features:** All systems operational"
             )
@@ -56,7 +56,7 @@ async def startup():
         # Start periodic maintenance
         asyncio.create_task(periodic_maintenance())
         
-        logger.info("🚀 Jhoom Music Bot started successfully!")
+        logger.info("🚀 JhoomMusic Bot started successfully!")
         
     except Exception as e:
         logger.error(f"❌ Failed to start bot: {e}")
@@ -65,13 +65,13 @@ async def startup():
 async def shutdown():
     """Bot shutdown tasks"""
     try:
-        logger.info("🛑 Shutting down Jhoom Music Bot...")
+        logger.info("🛑 Shutting down JhoomMusic Bot...")
         
         # Send shutdown notification
         try:
             await app.send_message(
                 Config.SUPER_GROUP_ID,
-                "🛑 **Jhoom Music Bot is shutting down...**"
+                "🛑 **JhoomMusic Bot is shutting down...**"
             )
         except Exception:
             pass
