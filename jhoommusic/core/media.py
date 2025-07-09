@@ -68,6 +68,7 @@ class MediaExtractor:
     async def extract_spotify_info(url: str) -> Optional[Union[Dict, List[Dict]]]:
         """Extract info from Spotify"""
         if not spotify:
+            logger.warning("Spotify credentials not configured")
             return None
         
         try:
@@ -105,6 +106,9 @@ class MediaExtractor:
                 tracks = []
                 for item in results['items'][:Config.MAX_PLAYLIST_SIZE]:
                     track = item['track']
+                    if not track:
+                        continue
+
                     search_query = f"{track['name']} {track['artists'][0]['name']}"
                     youtube_info = await MediaExtractor.extract_youtube_info(f"ytsearch:{search_query}")
                     
@@ -146,13 +150,11 @@ class MediaExtractor:
     async def extract_info(query: str, audio_only: bool = True) -> Optional[Union[Dict, List[Dict]]]:
         """Extract media info from various sources"""
         try:
-            # Determine source type
             if 'spotify.com' in query:
                 return await MediaExtractor.extract_spotify_info(query)
             elif any(x in query.lower() for x in ['radio', '.pls', '.m3u', 'stream']):
                 return await MediaExtractor.extract_radio_info(query)
             else:
-                # Default to YouTube
                 if not query.startswith('http'):
                     query = f"ytsearch:{query}"
                 return await MediaExtractor.extract_youtube_info(query, audio_only)
