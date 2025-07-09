@@ -2,8 +2,8 @@ import logging
 from typing import Dict, Optional
 from collections import defaultdict
 
-from pytgcalls.types.stream import AudioPiped, AudioVideoPiped
-from pytgcalls.types.stream.quality import HighQualityAudio, HighQualityVideo
+from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
+from pytgcalls.types.input_stream.quality import HighQualityAudio, HighQualityVideo
 from pytgcalls.exceptions import NoActiveGroupCall
 
 from .bot import pytgcalls, app
