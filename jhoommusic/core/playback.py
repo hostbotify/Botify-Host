@@ -1,9 +1,11 @@
 import logging
 from typing import Dict, Optional
 from collections import defaultdict
-from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
-from pytgcalls.types.input_stream.quality import HighQualityAudio, HighQualityVideo
+
+from pytgcalls.types.stream import AudioPiped, AudioVideoPiped
+from pytgcalls.types.stream.quality import HighQualityAudio, HighQualityVideo
 from pytgcalls.exceptions import NoActiveGroupCall
+
 from .bot import pytgcalls, app
 from .connection import connection_manager
 from .queue import queue_manager
