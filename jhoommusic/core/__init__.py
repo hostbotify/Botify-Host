@@ -1,4 +1,4 @@
-from .bot import app, pytgcalls
+from .bot import app, tgcaller
 from .config import Config
 from .database import db as Database
 from .connection import connection_manager as ConnectionManager
@@ -7,7 +7,7 @@ from .process import process_manager as ProcessManager
 
 __all__ = [
     "app",
-    "pytgcalls",
+    "tgcaller",
     "Config",
     "Database",
     "ConnectionManager",

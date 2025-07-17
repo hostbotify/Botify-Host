@@ -29,7 +29,6 @@ app = Client(
     plugins=dict(root="jhoommusic.plugins")
 )
 
-# Initialize PyTgCalls
-pytgcalls = PyTgCalls(app)
+# Initialize TgCaller
+tgcaller = TgCaller(app)
 
-logger.info("✅ Bot and PyTgCalls initialized successfully")

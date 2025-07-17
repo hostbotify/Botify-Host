@@ -237,7 +237,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [Pyrogram](https://github.com/pyrogram/pyrogram) - Telegram client library
-- [PyTgCalls](https://github.com/pytgcalls/pytgcalls) - Voice chat integration
+- [TgCaller](https://github.com/TgCaller/TgCaller) - Voice chat integration
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Media extraction
 - [Spotipy](https://github.com/plamere/spotipy) - Spotify integration
 

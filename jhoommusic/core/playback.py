@@ -2,11 +2,9 @@ import logging
 from typing import Dict, Optional
 from collections import defaultdict
 
-from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
-from pytgcalls.types.input_stream.quality import HighQualityAudio, HighQualityVideo
-from pytgcalls.exceptions import NoActiveGroupCall
+from TgCaller import AudioConfig, VideoConfig, YouTubeStreamer
 
-from .bot import pytgcalls, app
+from .bot import tgcaller, app
 from .connection import connection_manager
 from .queue import queue_manager
 from .process import process_manager
@@ -51,23 +49,24 @@ class PlaybackManager:
                 await app.send_message(chat_id, "❌ Failed to establish voice connection")
                 return False
             
-            # Create stream
-            if track.get('is_video', False):
-                stream = AudioVideoPiped(
-                    track['url'],
-                    audio_parameters=HighQualityAudio(),
-                    video_parameters=HighQualityVideo(),
-                    **ffmpeg_opts
-                )
+            # Play stream using TgCaller
+            if 'youtube.com' in track['url'] or 'youtu.be' in track['url']:
+                # Use YouTubeStreamer for YouTube URLs
+                streamer = YouTubeStreamer(track['url'])
+                if track.get('is_video', False):
+                    config = VideoConfig(bitrate=1000, fps=30, width=1280, height=720)
+                    await tgcaller.play(chat_id, streamer, video_config=config)
+                else:
+                    config = AudioConfig(bitrate=320)
+                    await tgcaller.play(chat_id, streamer, audio_config=config)
             else:
-                stream = AudioPiped(
-                    track['url'],
-                    audio_parameters=HighQualityAudio(),
-                    **ffmpeg_opts
-                )
-            
-            # Change stream
-            await pytgcalls.change_stream(chat_id, stream)
+                # Play local file or direct URL
+                if track.get('is_video', False):
+                    config = VideoConfig(bitrate=1000, fps=30, width=1280, height=720)
+                    await tgcaller.play(chat_id, track['url'], video_config=config)
+                else:
+                    config = AudioConfig(bitrate=320)
+                    await tgcaller.play(chat_id, track['url'], audio_config=config)
             
             # Send now playing message
             caption = self._format_now_playing(track)
@@ -84,15 +83,6 @@ class PlaybackManager:
             logger.info(f"Now playing in {chat_id}: {track['title']}")
             return True
             
-        except NoActiveGroupCall:
-            await connection_manager.release_connection(chat_id)
-            if chat_id in self.current_streams:
-                del self.current_streams[chat_id]
-            await app.send_message(
-                chat_id,
-                "❌ No active voice chat. Please start a voice chat first."
-            )
-            return False
         except Exception as e:
             logger.error(f"Playback error in chat {chat_id}: {e}")
             await app.send_message(chat_id, f"❌ Playback error: {str(e)}")
@@ -118,7 +108,7 @@ class PlaybackManager:
     async def pause_playback(self, chat_id: int) -> bool:
         """Pause playback"""
         try:
-            await pytgcalls.pause_stream(chat_id)
+            await tgcaller.pause(chat_id)
             return True
         except Exception as e:
             logger.error(f"Pause error in {chat_id}: {e}")
@@ -127,7 +117,7 @@ class PlaybackManager:
     async def resume_playback(self, chat_id: int) -> bool:
         """Resume playback"""
         try:
-            await pytgcalls.resume_stream(chat_id)
+            await tgcaller.resume(chat_id)
             return True
         except Exception as e:
             logger.error(f"Resume error in {chat_id}: {e}")
@@ -136,6 +126,7 @@ class PlaybackManager:
     async def stop_playback(self, chat_id: int) -> bool:
         """Stop playback and clear queue"""
         try:
+            await tgcaller.stop(chat_id)
             await connection_manager.release_connection(chat_id)
             if chat_id in self.current_streams:
                 del self.current_streams[chat_id]

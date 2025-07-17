@@ -10,7 +10,7 @@ import asyncio
 import logging
 import signal
 import sys
-from jhoommusic.core.bot import app, pytgcalls
+from jhoommusic.core.bot import app, tgcaller
 from jhoommusic.core.database import db
 from jhoommusic.core.config import Config
 from jhoommusic.core.troubleshoot import troubleshoot_manager
@@ -37,9 +37,9 @@ async def startup():
         await db.connect()
         logger.info("✅ Database connected")
         
-        # Start PyTgCalls
-        await pytgcalls.start()
-        logger.info("✅ PyTgCalls started")
+        # Start TgCaller
+        await tgcaller.start()
+        logger.info("✅ TgCaller started")
         
         # Send startup notification
         try:
@@ -76,8 +76,8 @@ async def shutdown():
         except Exception:
             pass
         
-        # Stop PyTgCalls
-        await pytgcalls.stop()
+        # Stop TgCaller
+        await tgcaller.stop()
         
         # Close database connection
         await db.close()

@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Set
-from .bot import app, pytgcalls
+from .bot import app, tgcaller
 from .database import db
 from .connection import connection_manager
 from .playback import playback_manager
@@ -189,13 +189,13 @@ class TroubleshootManager:
                 try:
                     # Check if bot is alone in voice chat
                     if connection_manager.is_connected(chat_id):
-                        participants = await pytgcalls.get_participants(chat_id)
-                        if len(participants) <= 1:  # Only bot in call
+                        # Check if call is still active
+                        if not await tgcaller.is_connected(chat_id):
                             await self.log_action(
                                 chat_id,
                                 "health_check",
-                                "no_listeners",
-                                "Only bot in voice chat"
+                                "disconnected",
+                                "Call disconnected"
                             )
                             await connection_manager.release_connection(chat_id)
                             
