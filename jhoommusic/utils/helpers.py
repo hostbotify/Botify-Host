@@ -60,13 +60,23 @@ async def is_admin_or_sudo(chat_id: int, user_id: int) -> bool:
 
 async def is_user_gbanned(user_id: int) -> bool:
     """Check if user is globally banned"""
-    return await db.gbanned_users.find_one({"user_id": user_id}) is not None
+    if not db.enabled:
+        return False
+    try:
+        return await db.gbanned_users.find_one({"user_id": user_id}) is not None
+    except Exception:
+        return False
 
 async def check_user_auth(user_id: int) -> bool:
     """Check if user is authorized"""
     if user_id in Config.SUDO_USERS:
         return True
-    return await db.auth_users.find_one({"user_id": user_id}) is not None
+    if not db.enabled:
+        return True  # Allow all users when DB is disabled
+    try:
+        return await db.auth_users.find_one({"user_id": user_id}) is not None
+    except Exception:
+        return True  # Allow on error
 
 def extract_chat_id(message: Message) -> int:
     """Extract chat ID from message text or reply"""
@@ -80,6 +90,8 @@ def extract_chat_id(message: Message) -> int:
 
 async def save_user_to_db(user):
     """Save user to database"""
+    if not db.enabled:
+        return
     try:
         await db.users.update_one(
             {"user_id": user.id},
@@ -99,6 +111,8 @@ async def save_user_to_db(user):
 
 async def save_chat_to_db(chat):
     """Save chat to database"""
+    if not db.enabled:
+        return
     try:
         await db.chats.update_one(
             {"chat_id": chat.id},

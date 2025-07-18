@@ -35,23 +35,27 @@ async def startup():
         
         # Connect to database
         await db.connect()
-        logger.info("✅ Database connected")
+        if db.enabled:
+            logger.info("✅ Database connected")
+        else:
+            logger.info("⚠️ Running without database")
         
         # Start TgCaller
         await tgcaller.start()
         logger.info("✅ TgCaller started")
         
         # Send startup notification
-        try:
-            await app.send_photo(
-                Config.SUPER_GROUP_ID,
-                UI_IMAGES["startup"],
-                caption="⚡ **JhoomMusic Bot is now online!**\n"
-                f"**Version:** 1.0\n"
-                f"**Features:** All systems operational"
-            )
-        except Exception as e:
-            logger.warning(f"Could not send startup notification: {e}")
+        if Config.SUPER_GROUP_ID and Config.SUPER_GROUP_ID != 0:
+            try:
+                await app.send_photo(
+                    Config.SUPER_GROUP_ID,
+                    UI_IMAGES["startup"],
+                    caption="⚡ **JhoomMusic Bot is now online!**\n"
+                    f"**Version:** 1.0\n"
+                    f"**Features:** All systems operational"
+                )
+            except Exception as e:
+                logger.warning(f"Could not send startup notification: {e}")
         
         # Start periodic maintenance
         asyncio.create_task(periodic_maintenance())
@@ -68,16 +72,20 @@ async def shutdown():
         logger.info("🛑 Shutting down JhoomMusic Bot...")
         
         # Send shutdown notification
-        try:
-            await app.send_message(
-                Config.SUPER_GROUP_ID,
-                "🛑 **JhoomMusic Bot is shutting down...**"
-            )
-        except Exception:
-            pass
+        if Config.SUPER_GROUP_ID and Config.SUPER_GROUP_ID != 0:
+            try:
+                await app.send_message(
+                    Config.SUPER_GROUP_ID,
+                    "🛑 **JhoomMusic Bot is shutting down...**"
+                )
+            except Exception:
+                pass
         
         # Stop TgCaller
-        await tgcaller.stop()
+        try:
+            await tgcaller.stop()
+        except Exception as e:
+            logger.error(f"Error stopping TgCaller: {e}")
         
         # Close database connection
         await db.close()
@@ -101,7 +109,9 @@ async def periodic_maintenance():
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
     logger.info(f"Received signal {signum}")
-    asyncio.create_task(shutdown())
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        loop.create_task(shutdown())
     sys.exit(0)
 
 async def main():
@@ -115,11 +125,13 @@ async def main():
     
     # Start the bot
     try:
-        await app.start()
+        if not app.is_connected:
+            await app.start()
         logger.info("✅ Pyrogram client started")
         
         # Keep the bot running
-        await asyncio.Event().wait()
+        stop_event = asyncio.Event()
+        await stop_event.wait()
         
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")

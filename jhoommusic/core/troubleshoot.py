@@ -177,6 +177,10 @@ class TroubleshootManager:
     
     async def health_check_all_chats(self):
         """Check health of all active chats"""
+        if not db.enabled:
+            logger.debug("MongoDB not enabled. Skipping health check.")
+            return
+            
         try:
             all_chats = await db.chats.find().to_list(None)
             for chat in all_chats:
@@ -190,7 +194,8 @@ class TroubleshootManager:
                     # Check if bot is alone in voice chat
                     if connection_manager.is_connected(chat_id):
                         # Check if call is still active using TgCaller
-                        if not await tgcaller.get_call(chat_id):
+                        call_info = await tgcaller.get_call(chat_id)
+                        if not call_info:
                             await self.log_action(
                                 chat_id,
                                 "health_check",

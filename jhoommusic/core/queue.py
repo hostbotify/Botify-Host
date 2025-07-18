@@ -24,11 +24,15 @@ class QueueManager:
             self.queues[chat_id].append(track)
             
             # Save to database
-            await db.channel_queues.insert_one({
-                "chat_id": chat_id,
-                "track": track,
-                "timestamp": datetime.utcnow()
-            })
+            if db.enabled:
+                try:
+                    await db.channel_queues.insert_one({
+                        "chat_id": chat_id,
+                        "track": track,
+                        "timestamp": datetime.utcnow()
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to save track to DB: {e}")
             
             logger.info(f"Added track to queue {chat_id}: {track.get('title', 'Unknown')}")
     
@@ -41,15 +45,19 @@ class QueueManager:
                 await self._remove_from_db(chat_id, track)
                 return track
             
-            # Try database queue
-            db_track = await db.channel_queues.find_one(
-                {"chat_id": chat_id},
-                sort=[("timestamp", 1)]
-            )
-            
-            if db_track:
-                await db.channel_queues.delete_one({"_id": db_track["_id"]})
-                return db_track['track']
+            # Try database queue if enabled
+            if db.enabled:
+                try:
+                    db_track = await db.channel_queues.find_one(
+                        {"chat_id": chat_id},
+                        sort=[("timestamp", 1)]
+                    )
+                    
+                    if db_track:
+                        await db.channel_queues.delete_one({"_id": db_track["_id"]})
+                        return db_track['track']
+                except Exception as e:
+                    logger.error(f"Failed to get track from DB: {e}")
             
             return None
     
@@ -62,26 +70,36 @@ class QueueManager:
                 self.queues[chat_id].clear()
             
             # Clear database queue
-            result = await db.channel_queues.delete_many({"chat_id": chat_id})
+            db_deleted = 0
+            if db.enabled:
+                try:
+                    result = await db.channel_queues.delete_many({"chat_id": chat_id})
+                    db_deleted = result.deleted_count
+                except Exception as e:
+                    logger.error(f"Failed to clear DB queue: {e}")
             
-            logger.info(f"Cleared queue for chat {chat_id}: {queue_size + result.deleted_count} tracks")
-            return queue_size + result.deleted_count
+            total_cleared = queue_size + db_deleted
+            logger.info(f"Cleared queue for chat {chat_id}: {total_cleared} tracks")
+            return total_cleared
     
     async def get_queue(self, chat_id: int, limit: int = 10) -> List[Dict]:
         """Get current queue"""
         async with self.locks[chat_id]:
             memory_queue = self.queues.get(chat_id, [])[:limit]
             
-            if len(memory_queue) < limit:
+            if len(memory_queue) < limit and db.enabled:
                 # Get additional tracks from database
-                remaining = limit - len(memory_queue)
-                db_tracks = await db.channel_queues.find(
-                    {"chat_id": chat_id},
-                    sort=[("timestamp", 1)]
-                ).limit(remaining).to_list(remaining)
-                
-                db_queue = [track['track'] for track in db_tracks]
-                return memory_queue + db_queue
+                try:
+                    remaining = limit - len(memory_queue)
+                    db_tracks = await db.channel_queues.find(
+                        {"chat_id": chat_id},
+                        sort=[("timestamp", 1)]
+                    ).limit(remaining).to_list(remaining)
+                    
+                    db_queue = [track['track'] for track in db_tracks]
+                    return memory_queue + db_queue
+                except Exception as e:
+                    logger.error(f"Failed to get DB queue: {e}")
             
             return memory_queue
     
@@ -97,6 +115,8 @@ class QueueManager:
     
     async def _remove_from_db(self, chat_id: int, track: Dict):
         """Remove track from database"""
+        if not db.enabled:
+            return
         try:
             await db.channel_queues.delete_one({
                 "chat_id": chat_id,

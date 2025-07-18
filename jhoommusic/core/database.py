@@ -11,6 +11,7 @@ class Database:
         self.client = None
         self.db = None
         self._collections = {}
+        self.enabled = False
 
     async def connect(self):
         """Connect to MongoDB"""
@@ -21,17 +22,23 @@ class Database:
             # Test connection
             await self.client.admin.command('ping')
             logger.info("✅ Connected to MongoDB successfully")
+            self.enabled = True
 
             # Initialize collections
             await self._init_collections()
             await self._create_indexes()
 
         except Exception as e:
-            logger.error(f"❌ Failed to connect to MongoDB: {e}")
-            raise
+            logger.warning(f"⚠️ MongoDB connection failed: {e}")
+            logger.warning("⚠️ Bot will run without database functionality")
+            self.enabled = False
+            # Don't raise exception, allow bot to continue without DB
 
     async def _init_collections(self):
         """Initialize database collections"""
+        if not self.enabled:
+            return
+            
         collection_names = [
             'users', 'chats', 'blocked_users', 'blacklisted_chats',
             'auth_users', 'channel_connections', 'channel_queues',
@@ -44,6 +51,9 @@ class Database:
 
     async def _create_indexes(self):
         """Create database indexes for better performance"""
+        if not self.enabled:
+            return
+            
         try:
             await self._collections['users'].create_index("user_id", unique=True)
             await self._collections['chats'].create_index("chat_id", unique=True)
@@ -62,13 +72,15 @@ class Database:
 
     def __getattr__(self, name):
         """Allow direct access to collections"""
+        if not self.enabled:
+            raise AttributeError(f"Database not enabled. Cannot access collection '{name}'")
         if name in self._collections:
             return self._collections[name]
         raise AttributeError(f"Collection '{name}' not found")
 
     async def close(self):
         """Close database connection"""
-        if self.client:
+        if self.client and self.enabled:
             self.client.close()
             logger.info("🔒 Database connection closed")
 
