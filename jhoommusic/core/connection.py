@@ -22,8 +22,8 @@ class ConnectionManager:
                 return True
             
             try:
-                # Join voice chat
-                await tgcaller.join_call(chat_id)
+                # Join voice chat using TgCaller
+                await tgcaller.join(chat_id)
                 self.active_connections[chat_id] = True
                 logger.info(f"Connected to voice chat: {chat_id}")
                 return True
@@ -53,8 +53,8 @@ class ConnectionManager:
             inactive_chats = []
             for chat_id in list(self.active_connections.keys()):
                 try:
-                    # Check if call is still active
-                    if not await tgcaller.is_connected(chat_id):
+                    # Check if call is still active using TgCaller
+                    if not await tgcaller.get_call(chat_id):
                         inactive_chats.append(chat_id)
                 except Exception:
                     inactive_chats.append(chat_id)

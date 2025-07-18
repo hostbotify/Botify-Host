@@ -1,9 +1,6 @@
 import logging
 from typing import Dict, Optional
 from collections import defaultdict
-
-from TgCaller import AudioConfig, VideoConfig, YouTubeStreamer
-
 from .bot import tgcaller, app
 from .connection import connection_manager
 from .queue import queue_manager
@@ -126,7 +123,7 @@ class PlaybackManager:
     async def stop_playback(self, chat_id: int) -> bool:
         """Stop playback and clear queue"""
         try:
-            await tgcaller.stop(chat_id)
+            await tgcaller.stop_stream(chat_id)
             await connection_manager.release_connection(chat_id)
             if chat_id in self.current_streams:
                 del self.current_streams[chat_id]

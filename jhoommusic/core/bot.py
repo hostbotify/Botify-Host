@@ -1,6 +1,6 @@
 import logging
 from pyrogram import Client
-from pytgcalls import PyTgCalls
+from tgcaller import TgCaller
 from .config import Config
 
 # Configure logging

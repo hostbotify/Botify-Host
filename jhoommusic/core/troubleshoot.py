@@ -189,8 +189,8 @@ class TroubleshootManager:
                 try:
                     # Check if bot is alone in voice chat
                     if connection_manager.is_connected(chat_id):
-                        # Check if call is still active
-                        if not await tgcaller.is_connected(chat_id):
+                        # Check if call is still active using TgCaller
+                        if not await tgcaller.get_call(chat_id):
                             await self.log_action(
                                 chat_id,
                                 "health_check",
