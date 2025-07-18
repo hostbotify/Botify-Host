@@ -75,10 +75,17 @@ async def show_stats(_, message: Message):
         uptime = get_uptime()
         
         # Get database stats
-        total_chats = await db.chats.count_documents({})
-        total_users = await db.users.count_documents({})
-        auth_users = await db.auth_users.count_documents({})
-        gbanned_users = await db.gbanned_users.count_documents({})
+        if db.enabled:
+            try:
+                total_chats = await db.chats.count_documents({})
+                total_users = await db.users.count_documents({})
+                auth_users = await db.auth_users.count_documents({})
+                gbanned_users = await db.gbanned_users.count_documents({})
+            except Exception as e:
+                logger.error(f"Error getting DB stats: {e}")
+                total_chats = total_users = auth_users = gbanned_users = 0
+        else:
+            total_chats = total_users = auth_users = gbanned_users = 0
         
         # Get cache stats
         cache_stats = await get_cache_stats()
@@ -99,6 +106,7 @@ async def show_stats(_, message: Message):
 • **Python:** `{python_version}`
 
 **📊 Database Stats:**
+• **Status:** `{'Connected' if db.enabled else 'Disabled'}`
 • **Total Chats:** `{total_chats}`
 • **Total Users:** `{total_users}`
 • **Auth Users:** `{auth_users}`
