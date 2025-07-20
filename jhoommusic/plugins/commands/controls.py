@@ -4,6 +4,7 @@ from pyrogram.types import Message
 from ...core.bot import app
 from ...core.playback import playback_manager
 from ...core.queue import queue_manager
+from ...core.stream_manager import stream_manager
 from ...constants.images import UI_IMAGES
 from ...utils.helpers import is_admin_or_sudo, save_user_to_db, save_chat_to_db
 
@@ -141,7 +142,7 @@ async def stop_music(_, message: Message):
             return
         
         # Stop playback
-        if await playback_manager.stop_playback(chat_id):
+        if await stream_manager.stop_stream(chat_id):
             await message.reply_photo(
                 photo=UI_IMAGES["sultan"],
                 caption="⏹ **Playback stopped and queue cleared**"

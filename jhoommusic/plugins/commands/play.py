@@ -2,7 +2,7 @@ import logging
 from pyrogram import filters
 from pyrogram.types import Message
 from ...core.bot import app
-from ...core.media import media_extractor
+from ...core.media_extractor import universal_extractor
 from ...core.playback import playback_manager
 from ...core.queue import queue_manager
 from ...core.thumbnail import generate_thumbnail
@@ -64,8 +64,8 @@ async def play_music(_, message: Message):
             # Extract query from command
             query = " ".join(message.command[1:])
             
-            # Extract media info
-            track_info = await media_extractor.extract_info(query)
+            # Extract media info using universal extractor
+            track_info = await universal_extractor.extract(query, audio_only=True)
             if not track_info:
                 await message.reply_photo(
                     photo=UI_IMAGES["error"],
@@ -180,8 +180,8 @@ async def video_play(_, message: Message):
         query = " ".join(message.command[1:])
         chat_id = message.chat.id
         
-        # Extract video info
-        video_info = await media_extractor.extract_info(query, audio_only=False)
+        # Extract video info using universal extractor
+        video_info = await universal_extractor.extract(query, audio_only=False)
         if not video_info:
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
