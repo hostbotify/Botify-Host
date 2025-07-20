@@ -4,7 +4,7 @@ from collections import defaultdict
 from .bot import tgcaller, app
 from .connection import connection_manager
 from .queue import queue_manager
-from .process import process_manager
+from .stream_manager import stream_manager
 from .thumbnail import generate_thumbnail
 from ..constants.images import UI_IMAGES
 from ..utils.helpers import format_duration
@@ -26,7 +26,18 @@ class PlaybackManager:
             if not same_track:
                 self.current_streams[chat_id] = track
             
-            # Generate thumbnail
+            # Use stream manager for playback
+            success = await stream_manager.start_stream(
+                chat_id, 
+                track['url'], 
+                video=track.get('is_video', False)
+            )
+            
+            if not success:
+                await app.send_message(chat_id, "❌ Failed to start playback")
+                return False
+            
+            # Send now playing message
             thumb = await generate_thumbnail(
                 title=track['title'],
                 artist=track.get('artist', 'Unknown Artist'),
@@ -35,37 +46,6 @@ class PlaybackManager:
                 requester_id=track.get('user_id')
             )
             
-            # Get FFmpeg options
-            ffmpeg_opts = process_manager.get_ffmpeg_options(
-                chat_id, 
-                track.get('is_video', False)
-            )
-            
-            # Ensure connection
-            if not await connection_manager.get_connection(chat_id):
-                await app.send_message(chat_id, "❌ Failed to establish voice connection")
-                return False
-            
-            # Play stream using TgCaller
-            if 'youtube.com' in track['url'] or 'youtu.be' in track['url']:
-                # Use YouTubeStreamer for YouTube URLs
-                streamer = YouTubeStreamer(track['url'])
-                if track.get('is_video', False):
-                    config = VideoConfig(bitrate=1000, fps=30, width=1280, height=720)
-                    await tgcaller.play(chat_id, streamer, video_config=config)
-                else:
-                    config = AudioConfig(bitrate=320)
-                    await tgcaller.play(chat_id, streamer, audio_config=config)
-            else:
-                # Play local file or direct URL
-                if track.get('is_video', False):
-                    config = VideoConfig(bitrate=1000, fps=30, width=1280, height=720)
-                    await tgcaller.play(chat_id, track['url'], video_config=config)
-                else:
-                    config = AudioConfig(bitrate=320)
-                    await tgcaller.play(chat_id, track['url'], audio_config=config)
-            
-            # Send now playing message
             caption = self._format_now_playing(track)
             msg = await app.send_photo(
                 chat_id,
@@ -104,34 +84,20 @@ class PlaybackManager:
     
     async def pause_playback(self, chat_id: int) -> bool:
         """Pause playback"""
-        try:
-            await tgcaller.pause(chat_id)
-            return True
-        except Exception as e:
-            logger.error(f"Pause error in {chat_id}: {e}")
-            return False
+        return await stream_manager.pause_stream(chat_id)
     
     async def resume_playback(self, chat_id: int) -> bool:
         """Resume playback"""
-        try:
-            await tgcaller.resume(chat_id)
-            return True
-        except Exception as e:
-            logger.error(f"Resume error in {chat_id}: {e}")
-            return False
+        return await stream_manager.resume_stream(chat_id)
     
     async def stop_playback(self, chat_id: int) -> bool:
         """Stop playback and clear queue"""
-        try:
-            await tgcaller.stop_stream(chat_id)
-            await connection_manager.release_connection(chat_id)
+        success = await stream_manager.stop_stream(chat_id)
+        if success:
             if chat_id in self.current_streams:
                 del self.current_streams[chat_id]
             await queue_manager.clear_queue(chat_id)
-            return True
-        except Exception as e:
-            logger.error(f"Stop error in {chat_id}: {e}")
-            return False
+        return success
     
     async def skip_track(self, chat_id: int) -> bool:
         """Skip current track"""
