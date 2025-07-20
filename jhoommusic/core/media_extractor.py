@@ -81,7 +81,7 @@ class UniversalMediaExtractor:
         return 'generic'
     
     async def _extract_youtube(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
-        """Enhanced YouTube extraction with bypass"""
+        """Enhanced YouTube extraction with advanced bypass"""
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -94,7 +94,7 @@ class UniversalMediaExtractor:
             'extractor_args': {
                 'youtube': {
                     'skip': ['dash', 'hls'] if kwargs.get('audio_only', True) else [],
-                    'player_client': ['android', 'web'],
+                    'player_client': ['android', 'web', 'android_embedded'],
                     'player_skip': ['configs']
                 }
             },
