@@ -90,7 +90,7 @@ def extract_chat_id(message: Message) -> int:
 
 async def save_user_to_db(user):
     """Save user to database"""
-    if not db.enabled:
+    if not db.enabled or not user:
         return
     try:
         await db.users.update_one(
@@ -111,7 +111,7 @@ async def save_user_to_db(user):
 
 async def save_chat_to_db(chat):
     """Save chat to database"""
-    if not db.enabled:
+    if not db.enabled or not chat:
         return
     try:
         await db.chats.update_one(
