@@ -29,8 +29,8 @@ class Database:
             await self._create_indexes()
 
         except Exception as e:
-            logger.warning(f"⚠️ MongoDB connection failed: {e}")
-            logger.warning("⚠️ Bot will run without database functionality")
+            logger.error(f"❌ Failed to connect to MongoDB: {e}")
+            logger.warning("⚠️ Skipping MongoDB. Bot will run without database.")
             self.enabled = False
             # Don't raise exception, allow bot to continue without DB
 
