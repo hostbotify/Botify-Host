@@ -178,7 +178,7 @@ class TroubleshootManager:
     async def health_check_all_chats(self):
         """Check health of all active chats"""
         if not db.enabled:
-            logger.debug("MongoDB not enabled. Skipping health check.")
+            logger.debug("Database not enabled. Skipping health check.")
             return
             
         try:
