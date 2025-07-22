@@ -55,11 +55,8 @@ class StreamManager:
                         return False
                     logger.info(f"ℹ️ Already in voice chat: {chat_id}")
                 
-                # Start streaming
-                if is_video:
-                    success = await self._start_video_stream(chat_id, stream_url, media_info)
-                else:
-                    success = await self._start_audio_stream(chat_id, stream_url, media_info)
+                # Start streaming with proper format
+                success = await self._start_stream_with_format(chat_id, stream_url, media_info, is_video)
                 
                 if success:
                     self.active_streams[chat_id] = {
@@ -78,38 +75,26 @@ class StreamManager:
                 logger.error(f"❌ Stream start error: {e}")
                 return False
     
+    async def _start_stream_with_format(self, chat_id: int, url: str, info: Dict, is_video: bool) -> bool:
+        """Start stream with proper format handling"""
+        try:
+            if is_video:
+                # Video streaming
+                return await self._start_video_stream(chat_id, url, info)
+            else:
+                # Audio streaming
+                return await self._start_audio_stream(chat_id, url, info)
+                
+        except Exception as e:
+            logger.error(f"❌ Format stream error: {e}")
+            return False
+    
     async def _start_audio_stream(self, chat_id: int, url: str, info: Dict) -> bool:
-        """Start audio stream using TgCaller"""
+        """Start audio stream using TgCaller with FFmpeg pipe"""
         try:
-            # Use TgCaller's play method for audio
-            await tgcaller.play(chat_id, url)
-            logger.info(f"🎵 Audio stream started: {info.get('title', 'Unknown')}")
-            return True
+            logger.info(f"🎵 Starting audio stream: {info.get('title', 'Unknown')}")
             
-        except Exception as e:
-            logger.error(f"❌ Audio stream error: {e}")
-            # Try with ffmpeg pipe as fallback
-            return await self._start_audio_with_ffmpeg(chat_id, url, info)
-    
-    async def _start_video_stream(self, chat_id: int, url: str, info: Dict) -> bool:
-        """Start video stream using TgCaller"""
-        try:
-            # Use TgCaller's play method for video
-            await tgcaller.play(chat_id, url, video=True)
-            logger.info(f"📺 Video stream started: {info.get('title', 'Unknown')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Video stream error: {e}")
-            # Try with ffmpeg pipe as fallback
-            return await self._start_video_with_ffmpeg(chat_id, url, info)
-    
-    async def _start_audio_with_ffmpeg(self, chat_id: int, url: str, info: Dict) -> bool:
-        """Fallback audio streaming with ffmpeg pipe"""
-        try:
-            logger.info(f"🔄 Trying ffmpeg fallback for audio: {chat_id}")
-            
-            # FFmpeg command for audio
+            # FFmpeg command for audio processing
             ffmpeg_cmd = [
                 'ffmpeg',
                 '-i', url,
@@ -117,8 +102,11 @@ class StreamManager:
                 '-ac', '2',
                 '-ar', '48000',
                 '-acodec', 'pcm_s16le',
+                '-loglevel', 'error',
                 '-'
             ]
+            
+            logger.info(f"🔧 FFmpeg command: {' '.join(ffmpeg_cmd[:4])}...")
             
             # Start ffmpeg process
             process = await asyncio.create_subprocess_exec(
@@ -129,21 +117,29 @@ class StreamManager:
             
             self.ffmpeg_processes[chat_id] = process
             
-            # Stream to TgCaller
+            # Stream to TgCaller using the stdout pipe
             await tgcaller.play(chat_id, process.stdout)
-            logger.info(f"✅ FFmpeg audio fallback successful")
+            logger.info(f"✅ Audio stream started successfully")
             return True
             
         except Exception as e:
-            logger.error(f"❌ FFmpeg audio fallback failed: {e}")
-            return False
+            logger.error(f"❌ Audio stream error: {e}")
+            # Try direct URL as fallback
+            try:
+                logger.info(f"🔄 Trying direct URL fallback...")
+                await tgcaller.play(chat_id, url)
+                logger.info(f"✅ Direct URL fallback successful")
+                return True
+            except Exception as e2:
+                logger.error(f"❌ Direct URL fallback failed: {e2}")
+                return False
     
-    async def _start_video_with_ffmpeg(self, chat_id: int, url: str, info: Dict) -> bool:
-        """Fallback video streaming with ffmpeg pipe"""
+    async def _start_video_stream(self, chat_id: int, url: str, info: Dict) -> bool:
+        """Start video stream using TgCaller with FFmpeg pipe"""
         try:
-            logger.info(f"🔄 Trying ffmpeg fallback for video: {chat_id}")
+            logger.info(f"📺 Starting video stream: {info.get('title', 'Unknown')}")
             
-            # FFmpeg command for video
+            # FFmpeg command for video processing
             ffmpeg_cmd = [
                 'ffmpeg',
                 '-i', url,
@@ -151,8 +147,11 @@ class StreamManager:
                 '-pix_fmt', 'yuv420p',
                 '-vf', 'scale=640:480',
                 '-r', '30',
+                '-loglevel', 'error',
                 '-'
             ]
+            
+            logger.info(f"🔧 FFmpeg video command: {' '.join(ffmpeg_cmd[:4])}...")
             
             # Start ffmpeg process
             process = await asyncio.create_subprocess_exec(
@@ -163,14 +162,22 @@ class StreamManager:
             
             self.ffmpeg_processes[chat_id] = process
             
-            # Stream to TgCaller
+            # Stream to TgCaller using the stdout pipe
             await tgcaller.play(chat_id, process.stdout, video=True)
-            logger.info(f"✅ FFmpeg video fallback successful")
+            logger.info(f"✅ Video stream started successfully")
             return True
             
         except Exception as e:
-            logger.error(f"❌ FFmpeg video fallback failed: {e}")
-            return False
+            logger.error(f"❌ Video stream error: {e}")
+            # Try direct URL as fallback
+            try:
+                logger.info(f"🔄 Trying direct video URL fallback...")
+                await tgcaller.play(chat_id, url, video=True)
+                logger.info(f"✅ Direct video URL fallback successful")
+                return True
+            except Exception as e2:
+                logger.error(f"❌ Direct video URL fallback failed: {e2}")
+                return False
     
     async def pause_stream(self, chat_id: int) -> bool:
         """Pause active stream"""

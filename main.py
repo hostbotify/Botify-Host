@@ -77,9 +77,13 @@ async def startup_tasks():
         await db.connect()
         logger.info("✅ Database initialized")
         
-        # Start TgCaller
-        await tgcaller.start()
-        logger.info("✅ TgCaller started")
+        # Start TgCaller with proper error handling
+        try:
+            await tgcaller.start()
+            logger.info("✅ TgCaller started successfully")
+        except Exception as e:
+            logger.error(f"❌ TgCaller start error: {e}")
+            # Don't exit, TgCaller might still work
         
         # Send startup message to super group if configured
         if Config.SUPER_GROUP_ID and Config.SUPER_GROUP_ID != 0:
@@ -92,7 +96,12 @@ async def startup_tasks():
                     f"✅ Database: {'Connected' if db.enabled else 'Disabled (Running in memory mode)'}\n"
                     f"✅ TgCaller: Active\n"
                     f"✅ FFmpeg: Available\n"
-                    f"✅ yt-dlp: Ready"
+                    f"✅ yt-dlp: Ready\n\n"
+                    f"**Commands:**\n"
+                    f"• `/play [song]` - Play music\n"
+                    f"• `/vplay [video]` - Play video\n"
+                    f"• `/join` - Join voice chat\n"
+                    f"• `/leave` - Leave voice chat"
                 )
                 logger.info("✅ Startup message sent")
             except Exception as e:
@@ -110,8 +119,11 @@ async def shutdown_tasks():
         logger.info("🛑 Shutting down JhoomMusic Bot...")
         
         # Stop all streams
-        await stream_manager.cleanup_all()
-        logger.info("✅ All streams stopped")
+        try:
+            await stream_manager.cleanup_all()
+            logger.info("✅ All streams stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping streams: {e}")
         
         # Stop TgCaller
         try:
@@ -121,12 +133,18 @@ async def shutdown_tasks():
             logger.error(f"❌ Error stopping TgCaller: {e}")
         
         # Close database connection
-        await db.close()
-        logger.info("✅ Database connection closed")
+        try:
+            await db.close()
+            logger.info("✅ Database connection closed")
+        except Exception as e:
+            logger.error(f"❌ Error closing database: {e}")
         
         # Stop the bot
-        await app.stop()
-        logger.info("✅ Bot stopped")
+        try:
+            await app.stop()
+            logger.info("✅ Bot stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping bot: {e}")
         
         logger.info("👋 Shutdown completed successfully")
         
@@ -184,10 +202,11 @@ if __name__ == "__main__":
     # Check if ffmpeg is available
     try:
         import subprocess
-        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
         logger.info("✅ FFmpeg is available")
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.error("❌ FFmpeg not found. Please install FFmpeg")
+        logger.error("Install with: sudo apt install ffmpeg (Ubuntu/Debian) or brew install ffmpeg (macOS)")
         sys.exit(1)
     
     # Run the bot

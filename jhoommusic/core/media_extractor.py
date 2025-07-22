@@ -24,7 +24,7 @@ class UniversalMediaExtractor:
             'Upgrade-Insecure-Requests': '1'
         })
         
-        # Base yt-dlp options
+        # Optimized yt-dlp options for TgCaller
         self.base_ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -33,7 +33,14 @@ class UniversalMediaExtractor:
             'geo_bypass': True,
             'geo_bypass_country': 'US',
             'socket_timeout': 30,
-            'http_headers': self.session.headers
+            'http_headers': self.session.headers,
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash'],
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs']
+                }
+            }
         }
     
     async def extract(self, query: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
@@ -96,14 +103,7 @@ class UniversalMediaExtractor:
         ydl_opts = self.base_ydl_opts.copy()
         ydl_opts.update({
             'format': self._get_format_selector(audio_only),
-            'noplaylist': not kwargs.get('playlist', False),
-            'extractor_args': {
-                'youtube': {
-                    'skip': ['dash', 'hls'] if audio_only else [],
-                    'player_client': ['android', 'web', 'android_embedded'],
-                    'player_skip': ['configs']
-                }
-            }
+            'noplaylist': not kwargs.get('playlist', False)
         })
         
         try:
@@ -136,7 +136,7 @@ class UniversalMediaExtractor:
             
             fallback_opts = self.base_ydl_opts.copy()
             fallback_opts.update({
-                'format': 'worst[ext=mp4]/worst',
+                'format': 'best[height<=480]/worst',
                 'noplaylist': True,
                 'extractor_args': {
                     'youtube': {
@@ -156,11 +156,13 @@ class UniversalMediaExtractor:
             return None
     
     def _get_format_selector(self, audio_only: bool) -> str:
-        """Get format selector for yt-dlp"""
+        """Get format selector for yt-dlp optimized for TgCaller"""
         if audio_only:
-            return 'bestaudio[ext=m4a]/bestaudio/best[height<=480]'
+            # Prefer formats that work well with TgCaller
+            return 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]'
         else:
-            return 'best[height<=720]/best[height<=480]/best'
+            # Video formats optimized for streaming
+            return 'best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best'
     
     def _detect_platform(self, url: str) -> str:
         """Detect platform from URL"""
@@ -236,11 +238,27 @@ class UniversalMediaExtractor:
     
     def _format_track_info(self, info: Dict) -> Dict:
         """Format track information consistently"""
+        # Get the best quality URL
+        url = info.get('url', '')
+        
+        # For YouTube, prefer direct stream URLs
+        if 'formats' in info:
+            formats = info['formats']
+            # Try to find the best audio format
+            audio_formats = [f for f in formats if f.get('acodec') != 'none']
+            if audio_formats:
+                # Sort by quality and prefer m4a/webm
+                audio_formats.sort(key=lambda x: (
+                    x.get('abr', 0),
+                    1 if x.get('ext') in ['m4a', 'webm'] else 0
+                ), reverse=True)
+                url = audio_formats[0].get('url', url)
+        
         return {
             'title': info.get('title', 'Unknown Track'),
             'artist': info.get('uploader', info.get('creator', 'Unknown Artist')),
             'duration': info.get('duration', 0),
-            'url': info.get('url', ''),
+            'url': url,
             'thumbnail': info.get('thumbnail'),
             'source': 'youtube',
             'is_video': info.get('vcodec') != 'none',

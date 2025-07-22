@@ -46,7 +46,15 @@ app = Client(
     plugins=dict(root="jhoommusic.plugins")
 )
 
-# Initialize TgCaller with proper configuration
-tgcaller = TgCaller(app, log_level=logging.INFO)
+# Initialize TgCaller with proper configuration for streaming
+tgcaller = TgCaller(
+    app, 
+    log_level=logging.INFO,
+    # Add streaming optimizations
+    ffmpeg_parameters={
+        'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+        'options': '-vn -preset ultrafast -tune zerolatency'
+    }
+)
 
 logger.info("✅ Bot and TgCaller initialized successfully")

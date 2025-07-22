@@ -71,7 +71,7 @@ async def play_music(_, message: Message):
                         f"**Requested by:** {message.from_user.mention}"
                     )
                 else:
-                    await processing_msg.edit_text("❌ Failed to start playback")
+                    await processing_msg.edit_text("❌ Failed to start playback. Check if bot has proper permissions.")
                 
             except Exception as e:
                 logger.error(f"❌ File processing error: {e}")
@@ -87,7 +87,7 @@ async def play_music(_, message: Message):
         processing_msg = await message.reply("🔄 **Searching and processing...**")
         
         try:
-            # Start streaming
+            # Start streaming with audio-only mode
             success = await stream_manager.start_stream(
                 chat_id, 
                 query,
@@ -104,16 +104,31 @@ async def play_music(_, message: Message):
                         f"**Artist:** {info.get('artist', 'Unknown')}\n"
                         f"**Duration:** {info.get('duration', 0)} seconds\n"
                         f"**Source:** {info.get('source', 'Unknown').title()}\n"
-                        f"**Requested by:** {message.from_user.mention}"
+                        f"**Requested by:** {message.from_user.mention}\n\n"
+                        f"**Controls:** Use /pause, /resume, /stop, /player"
                     )
                 else:
-                    await processing_msg.edit_text("▶️ **Playback started!**")
+                    await processing_msg.edit_text("▶️ **Playback started!**\n\nUse /player for controls.")
             else:
-                await processing_msg.edit_text("❌ Failed to start playback. Please try again.")
+                await processing_msg.edit_text(
+                    "❌ **Failed to start playback**\n\n"
+                    "**Possible issues:**\n"
+                    "• Bot needs admin rights in the group\n"
+                    "• Voice chat must be active\n"
+                    "• Check if the song/URL is valid\n\n"
+                    "Try: /join first, then /play again"
+                )
         
         except Exception as e:
             logger.error(f"❌ Play command error: {e}")
-            await processing_msg.edit_text(f"❌ Error: {str(e)}")
+            await processing_msg.edit_text(
+                f"❌ **Error occurred**\n\n"
+                f"**Details:** {str(e)[:200]}\n\n"
+                f"**Try:**\n"
+                f"• /join to connect to voice chat\n"
+                f"• Check bot permissions\n"
+                f"• Use a different song/URL"
+            )
         
         logger.info(f"✅ Play command completed for {message.from_user.id}")
         
@@ -182,16 +197,31 @@ async def video_play(_, message: Message):
                         f"**Artist:** {info.get('artist', 'Unknown')}\n"
                         f"**Duration:** {info.get('duration', 0)} seconds\n"
                         f"**Source:** {info.get('source', 'Unknown').title()}\n"
-                        f"**Requested by:** {message.from_user.mention}"
+                        f"**Requested by:** {message.from_user.mention}\n\n"
+                        f"**Controls:** Use /pause, /resume, /stop, /player"
                     )
                 else:
-                    await processing_msg.edit_text("📺 **Video playback started!**")
+                    await processing_msg.edit_text("📺 **Video playback started!**\n\nUse /player for controls.")
             else:
-                await processing_msg.edit_text("❌ Failed to start video playback. Please try again.")
+                await processing_msg.edit_text(
+                    "❌ **Failed to start video playback**\n\n"
+                    "**Possible issues:**\n"
+                    "• Bot needs admin rights in the group\n"
+                    "• Voice chat must be active\n"
+                    "• Check if the video/URL is valid\n\n"
+                    "Try: /join first, then /vplay again"
+                )
         
         except Exception as e:
             logger.error(f"❌ VPlay command error: {e}")
-            await processing_msg.edit_text(f"❌ Error: {str(e)}")
+            await processing_msg.edit_text(
+                f"❌ **Video error occurred**\n\n"
+                f"**Details:** {str(e)[:200]}\n\n"
+                f"**Try:**\n"
+                f"• /join to connect to voice chat\n"
+                f"• Check bot permissions\n"
+                f"• Use a different video/URL"
+            )
         
         logger.info(f"✅ VPlay command completed for {message.from_user.id}")
         
@@ -220,9 +250,21 @@ async def join_command(_, message: Message):
         success = await stream_manager.join_call(chat_id)
         
         if success:
-            await processing_msg.edit_text("✅ **Successfully joined voice chat!**")
+            await processing_msg.edit_text(
+                "✅ **Successfully joined voice chat!**\n\n"
+                "Now you can use:\n"
+                "• `/play [song]` - Play music\n"
+                "• `/vplay [video]` - Play video\n"
+                "• `/player` - Show controls"
+            )
         else:
-            await processing_msg.edit_text("❌ **Failed to join voice chat.**")
+            await processing_msg.edit_text(
+                "❌ **Failed to join voice chat**\n\n"
+                "**Make sure:**\n"
+                "• Voice chat is active in the group\n"
+                "• Bot has admin permissions\n"
+                "• Bot can manage voice chats"
+            )
         
         logger.info(f"✅ Join command completed: {success}")
         
