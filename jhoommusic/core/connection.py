@@ -2,8 +2,6 @@ import asyncio
 import logging
 from typing import Dict
 
-from TgCaller import AudioConfig
-
 from .bot import tgcaller
 
 logger = logging.getLogger(__name__)
@@ -54,7 +52,8 @@ class ConnectionManager:
             for chat_id in list(self.active_connections.keys()):
                 try:
                     # Check if call is still active using TgCaller
-                    if not await tgcaller.get_call(chat_id):
+                    call_info = await tgcaller.get_call(chat_id)
+                    if not call_info:
                         inactive_chats.append(chat_id)
                 except Exception:
                     inactive_chats.append(chat_id)

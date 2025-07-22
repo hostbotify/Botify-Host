@@ -194,15 +194,23 @@ class TroubleshootManager:
                     # Check if bot is alone in voice chat
                     if connection_manager.is_connected(chat_id):
                         # Check if call is still active using TgCaller
-                        call_info = await tgcaller.get_call(chat_id)
-                        if not call_info:
+                        try:
+                            call_info = await tgcaller.get_call(chat_id)
+                            if not call_info:
+                                await self.log_action(
+                                    chat_id,
+                                    "health_check",
+                                    "disconnected",
+                                    "Call disconnected"
+                                )
+                                await connection_manager.release_connection(chat_id)
+                        except Exception as e:
                             await self.log_action(
                                 chat_id,
                                 "health_check",
-                                "disconnected",
-                                "Call disconnected"
+                                "failed",
+                                f"Health check error: {e}"
                             )
-                            await connection_manager.release_connection(chat_id)
                             
                 except Exception as e:
                     logger.error(f"Health check error for {chat_id}: {e}")

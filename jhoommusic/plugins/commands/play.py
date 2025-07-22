@@ -28,7 +28,8 @@ async def play_music(_, message: Message):
             return
         
         # Check if user is authorized
-        if not await check_user_auth(message.from_user.id):
+        # Skip auth check if database is disabled
+        if db.enabled and not await check_user_auth(message.from_user.id):
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
                 caption="🔒 You need to be authorized to use this command."
@@ -162,7 +163,8 @@ async def video_play(_, message: Message):
             return
         
         # Check if user is authorized
-        if not await check_user_auth(message.from_user.id):
+        # Skip auth check if database is disabled
+        if db.enabled and not await check_user_auth(message.from_user.id):
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
                 caption="🔒 You need to be authorized to use this command."

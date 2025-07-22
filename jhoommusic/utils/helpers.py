@@ -64,7 +64,8 @@ async def is_user_gbanned(user_id: int) -> bool:
         return False
     try:
         return await db.gbanned_users.find_one({"user_id": user_id}) is not None
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error checking gban status: {e}")
         return False
 
 async def check_user_auth(user_id: int) -> bool:
@@ -75,7 +76,8 @@ async def check_user_auth(user_id: int) -> bool:
         return True  # Allow all users when DB is disabled
     try:
         return await db.auth_users.find_one({"user_id": user_id}) is not None
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error checking auth status: {e}")
         return True  # Allow on error
 
 def extract_chat_id(message: Message) -> int:

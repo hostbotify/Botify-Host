@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import Dict, Optional, Any
-from .bot import tgcaller
+from .bot import tgcaller, app
 from .media_extractor import universal_extractor
 
 logger = logging.getLogger(__name__)
@@ -69,14 +69,18 @@ class StreamManager:
     async def _start_audio_stream(self, chat_id: int, url: str, quality: str) -> bool:
         """Start audio stream with quality config"""
         try:
-            # Join call first
-            await tgcaller.join(chat_id)
+            # Join call first if not already joined
+            try:
+                await tgcaller.join(chat_id)
+            except Exception as e:
+                if "already joined" not in str(e).lower():
+                    raise e
             
             # Stream audio
-            if 'youtube.com' in url or 'youtu.be' in url:
-                await tgcaller.stream_youtube(chat_id, url, video=False)
+            if any(domain in url for domain in ['youtube.com', 'youtu.be', 'music.youtube.com']):
+                await tgcaller.play(chat_id, url, video=False)
             else:
-                await tgcaller.stream_audio(chat_id, url)
+                await tgcaller.play(chat_id, url, video=False)
             
             return True
             
@@ -87,14 +91,18 @@ class StreamManager:
     async def _start_video_stream(self, chat_id: int, url: str, quality: str) -> bool:
         """Start video stream with quality config"""
         try:
-            # Join call first
-            await tgcaller.join(chat_id)
+            # Join call first if not already joined
+            try:
+                await tgcaller.join(chat_id)
+            except Exception as e:
+                if "already joined" not in str(e).lower():
+                    raise e
             
             # Stream video
-            if 'youtube.com' in url or 'youtu.be' in url:
-                await tgcaller.stream_youtube(chat_id, url, video=True)
+            if any(domain in url for domain in ['youtube.com', 'youtu.be', 'music.youtube.com']):
+                await tgcaller.play(chat_id, url, video=True)
             else:
-                await tgcaller.stream_video(chat_id, url)
+                await tgcaller.play(chat_id, url, video=True)
             
             return True
             
@@ -105,7 +113,7 @@ class StreamManager:
     async def pause_stream(self, chat_id: int) -> bool:
         """Pause active stream"""
         try:
-            await tgcaller.pause_stream(chat_id)
+            await tgcaller.pause(chat_id)
             return True
         except Exception as e:
             logger.error(f"Pause error: {e}")
@@ -114,7 +122,7 @@ class StreamManager:
     async def resume_stream(self, chat_id: int) -> bool:
         """Resume paused stream"""
         try:
-            await tgcaller.resume_stream(chat_id)
+            await tgcaller.resume(chat_id)
             return True
         except Exception as e:
             logger.error(f"Resume error: {e}")
@@ -123,7 +131,7 @@ class StreamManager:
     async def stop_stream(self, chat_id: int) -> bool:
         """Stop active stream"""
         try:
-            await tgcaller.stop_stream(chat_id)
+            await tgcaller.stop(chat_id)
             await tgcaller.leave(chat_id)
             
             if chat_id in self.active_streams:

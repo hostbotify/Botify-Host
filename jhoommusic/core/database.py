@@ -16,11 +16,16 @@ class Database:
     async def connect(self):
         """Connect to MongoDB"""
         try:
-            self.client = AsyncIOMotorClient(Config.MONGO_URI)
+            self.client = AsyncIOMotorClient(
+                Config.MONGO_URI,
+                serverSelectionTimeoutMS=5000,  # 5 second timeout
+                connectTimeoutMS=5000,
+                socketTimeoutMS=5000
+            )
             self.db = self.client.jhoommusic
 
             # Test connection
-            await self.client.admin.command('ping')
+            await asyncio.wait_for(self.client.admin.command('ping'), timeout=5.0)
             logger.info("✅ Connected to MongoDB successfully")
             self.enabled = True
 

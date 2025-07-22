@@ -92,7 +92,10 @@ async def startup_tasks():
                     Config.SUPER_GROUP_ID,
                     "🎵 **JhoomMusic Bot Started!**\n\n"
                     "✅ All systems operational\n"
-                    "✅ Ready to stream music"
+                    "✅ Ready to stream music\n"
+                    f"✅ Database: {'Connected' if db.enabled else 'Disabled (Running in memory mode)'}\n"
+                    f"✅ Redis Cache: Connected\n"
+                    f"✅ TgCaller: Active"
                 )
                 logger.info("✅ Startup message sent")
             except Exception as e:

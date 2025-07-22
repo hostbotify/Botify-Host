@@ -20,7 +20,7 @@ async def pause_music(_, message: Message):
         chat_id = message.chat.id
         
         # Check if user is admin
-        if not stream_manager.is_streaming(chat_id):
+        if not playback_manager.is_playing(chat_id):
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
                 caption="❌ No active playback to control"

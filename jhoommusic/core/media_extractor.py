@@ -262,8 +262,15 @@ class UniversalMediaExtractor:
     
     async def _search_youtube(self, query: str) -> Optional[Dict]:
         """Search YouTube and return first result"""
-        search_url = f"ytsearch1:{query}"
-        return await self._extract_youtube(search_url, audio_only=True)
+        try:
+            search_url = f"ytsearch1:{query}"
+            result = await self._extract_youtube(search_url, audio_only=True)
+            if isinstance(result, list) and result:
+                return result[0]
+            return result
+        except Exception as e:
+            logger.error(f"YouTube search error: {e}")
+            return None
     
     def _extract_spotify_id(self, url: str) -> Optional[str]:
         """Extract Spotify ID from URL"""

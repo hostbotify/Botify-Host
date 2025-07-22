@@ -27,6 +27,18 @@ async def user_fix_command(_, message: Message):
             )
             return
         
+        # Quick auto-fix attempt first
+        try:
+            # Try to fix voice connection automatically
+            if await troubleshoot_manager.fix_voice_connection(chat_id):
+                await message.reply_photo(
+                    photo=UI_IMAGES["success"],
+                    caption="✅ **Auto-repair successful!**\n\nVoice connection has been restored automatically."
+                )
+                return
+        except Exception as e:
+            logger.error(f"Auto-fix failed: {e}")
+        
         # Create fix options
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Fix Voice Connection", callback_data=f"fix_voice_{chat_id}")],
