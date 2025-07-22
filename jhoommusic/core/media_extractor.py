@@ -11,7 +11,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class UniversalMediaExtractor:
-    """Advanced media extractor with bypass capabilities"""
+    """Advanced media extractor with async support"""
     
     def __init__(self):
         self.session = requests.Session()
@@ -24,38 +24,143 @@ class UniversalMediaExtractor:
             'Upgrade-Insecure-Requests': '1'
         })
         
-        # Platform-specific extractors
-        self.extractors = {
-            'youtube': self._extract_youtube,
-            'spotify': self._extract_spotify,
-            'soundcloud': self._extract_soundcloud,
-            'instagram': self._extract_instagram,
-            'tiktok': self._extract_tiktok,
-            'twitter': self._extract_twitter,
-            'facebook': self._extract_facebook,
-            'vimeo': self._extract_vimeo,
-            'dailymotion': self._extract_dailymotion,
-            'twitch': self._extract_twitch,
-            'generic': self._extract_generic
+        # Base yt-dlp options
+        self.base_ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'age_limit': 99,
+            'geo_bypass': True,
+            'geo_bypass_country': 'US',
+            'socket_timeout': 30,
+            'http_headers': self.session.headers
         }
     
-    async def extract(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
-        """Main extraction method with smart platform detection"""
+    async def extract(self, query: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
+        """Main extraction method with async support"""
         try:
-            platform = self._detect_platform(url)
-            extractor = self.extractors.get(platform, self.extractors['generic'])
+            logger.info(f"🔍 Extracting: {query}")
             
-            logger.info(f"Extracting from {platform}: {url}")
-            result = await extractor(url, **kwargs)
+            # Detect if it's a URL or search query
+            if self._is_url(query):
+                result = await self._extract_from_url(query, **kwargs)
+            else:
+                result = await self._search_and_extract(query, **kwargs)
             
             if result:
-                logger.info(f"Successfully extracted: {result.get('title', 'Unknown') if isinstance(result, dict) else f'{len(result)} items'}")
+                if isinstance(result, list):
+                    logger.info(f"✅ Extracted {len(result)} items")
+                else:
+                    logger.info(f"✅ Extracted: {result.get('title', 'Unknown')}")
+            else:
+                logger.error(f"❌ No results for: {query}")
             
             return result
             
         except Exception as e:
-            logger.error(f"Extraction failed for {url}: {e}")
+            logger.error(f"❌ Extraction failed for {query}: {e}")
             return None
+    
+    def _is_url(self, text: str) -> bool:
+        """Check if text is a URL"""
+        return bool(re.match(r'https?://', text))
+    
+    async def _extract_from_url(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
+        """Extract from URL"""
+        platform = self._detect_platform(url)
+        logger.info(f"🌐 Detected platform: {platform}")
+        
+        if platform == 'spotify':
+            return await self._extract_spotify(url, **kwargs)
+        else:
+            return await self._extract_with_ytdlp(url, **kwargs)
+    
+    async def _search_and_extract(self, query: str, **kwargs) -> Optional[Dict]:
+        """Search YouTube and extract first result"""
+        try:
+            search_query = f"ytsearch1:{query}"
+            result = await self._extract_with_ytdlp(search_query, **kwargs)
+            
+            if isinstance(result, list) and result:
+                return result[0]
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Search extraction error: {e}")
+            return None
+    
+    async def _extract_with_ytdlp(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
+        """Extract using yt-dlp with async support"""
+        audio_only = kwargs.get('audio_only', True)
+        
+        ydl_opts = self.base_ydl_opts.copy()
+        ydl_opts.update({
+            'format': self._get_format_selector(audio_only),
+            'noplaylist': not kwargs.get('playlist', False),
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash', 'hls'] if audio_only else [],
+                    'player_client': ['android', 'web', 'android_embedded'],
+                    'player_skip': ['configs']
+                }
+            }
+        })
+        
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # Run yt-dlp in executor to avoid blocking
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = await loop.run_in_executor(None, ydl.extract_info, url, False)
+                
+                if 'entries' in info:
+                    # Playlist
+                    tracks = []
+                    max_items = kwargs.get('max_playlist', 50)
+                    for entry in info['entries'][:max_items]:
+                        if entry:
+                            tracks.append(self._format_track_info(entry))
+                    return tracks
+                else:
+                    # Single item
+                    return self._format_track_info(info)
+                    
+        except Exception as e:
+            logger.error(f"❌ yt-dlp extraction error: {e}")
+            return await self._fallback_extract(url, **kwargs)
+    
+    async def _fallback_extract(self, url: str, **kwargs) -> Optional[Dict]:
+        """Fallback extraction with different options"""
+        try:
+            logger.info(f"🔄 Trying fallback extraction...")
+            
+            fallback_opts = self.base_ydl_opts.copy()
+            fallback_opts.update({
+                'format': 'worst[ext=mp4]/worst',
+                'noplaylist': True,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android_embedded', 'android_music'],
+                        'skip': ['webpage']
+                    }
+                }
+            })
+            
+            loop = asyncio.get_event_loop()
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                info = await loop.run_in_executor(None, ydl.extract_info, url, False)
+                return self._format_track_info(info)
+                
+        except Exception as e:
+            logger.error(f"❌ Fallback extraction failed: {e}")
+            return None
+    
+    def _get_format_selector(self, audio_only: bool) -> str:
+        """Get format selector for yt-dlp"""
+        if audio_only:
+            return 'bestaudio[ext=m4a]/bestaudio/best[height<=480]'
+        else:
+            return 'best[height<=720]/best[height<=480]/best'
     
     def _detect_platform(self, url: str) -> str:
         """Detect platform from URL"""
@@ -80,102 +185,22 @@ class UniversalMediaExtractor:
         
         return 'generic'
     
-    async def _extract_youtube(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
-        """Enhanced YouTube extraction with advanced bypass"""
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'format': kwargs.get('format', 'bestaudio[ext=m4a]/bestaudio/best'),
-            'noplaylist': not kwargs.get('playlist', False),
-            'extract_flat': False,
-            'age_limit': 99,
-            'geo_bypass': True,
-            'geo_bypass_country': 'US',
-            'extractor_args': {
-                'youtube': {
-                    'skip': ['dash', 'hls'] if kwargs.get('audio_only', True) else [],
-                    'player_client': ['android', 'web', 'android_embedded'],
-                    'player_skip': ['configs']
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate'
-            }
-        }
-        
-        # Add cookies if available
-        if kwargs.get('cookies'):
-            ydl_opts['cookiefile'] = kwargs['cookies']
-        
-        try:
-            loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(None, ydl.extract_info, url, False)
-                
-                if 'entries' in info:
-                    # Playlist
-                    tracks = []
-                    for entry in info['entries'][:kwargs.get('max_playlist', 50)]:
-                        if entry:
-                            tracks.append(self._format_track_info(entry, 'youtube'))
-                    return tracks
-                else:
-                    # Single video
-                    return self._format_track_info(info, 'youtube')
-                    
-        except Exception as e:
-            logger.error(f"YouTube extraction error: {e}")
-            return await self._fallback_youtube_extract(url, **kwargs)
-    
-    async def _fallback_youtube_extract(self, url: str, **kwargs) -> Optional[Dict]:
-        """Fallback YouTube extraction using alternative methods"""
-        try:
-            # Try with different user agents and bypass methods
-            fallback_opts = {
-                'quiet': True,
-                'format': 'worst[ext=mp4]/worst',  # Use worst quality as fallback
-                'noplaylist': True,
-                'age_limit': 99,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android_embedded', 'android_music', 'android_creator'],
-                        'skip': ['webpage']
-                    }
-                }
-            }
-            
-            loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
-                info = await loop.run_in_executor(None, ydl.extract_info, url, False)
-                return self._format_track_info(info, 'youtube')
-                
-        except Exception as e:
-            logger.error(f"Fallback YouTube extraction failed: {e}")
-            return None
-    
     async def _extract_spotify(self, url: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
-        """Spotify extraction (converts to YouTube search)"""
+        """Extract Spotify (convert to YouTube search)"""
         try:
-            # Extract Spotify metadata
-            spotify_id = self._extract_spotify_id(url)
-            if not spotify_id:
-                return None
+            logger.info(f"🎵 Converting Spotify to YouTube search...")
             
-            # Use Spotify Web API or scraping to get track info
-            track_info = await self._get_spotify_metadata(spotify_id, url)
+            # Extract Spotify metadata (simplified)
+            track_info = await self._get_spotify_metadata(url)
             if not track_info:
                 return None
             
-            # Search on YouTube
             if isinstance(track_info, list):
                 # Playlist
                 results = []
                 for track in track_info[:kwargs.get('max_playlist', 50)]:
                     search_query = f"{track['name']} {track['artist']}"
-                    youtube_result = await self._search_youtube(search_query)
+                    youtube_result = await self._search_and_extract(search_query)
                     if youtube_result:
                         youtube_result.update({
                             'original_title': track['name'],
@@ -187,7 +212,7 @@ class UniversalMediaExtractor:
             else:
                 # Single track
                 search_query = f"{track_info['name']} {track_info['artist']}"
-                youtube_result = await self._search_youtube(search_query)
+                youtube_result = await self._search_and_extract(search_query)
                 if youtube_result:
                     youtube_result.update({
                         'original_title': track_info['name'],
@@ -197,52 +222,19 @@ class UniversalMediaExtractor:
                 return youtube_result
                 
         except Exception as e:
-            logger.error(f"Spotify extraction error: {e}")
+            logger.error(f"❌ Spotify extraction error: {e}")
             return None
     
-    async def _extract_generic(self, url: str, **kwargs) -> Optional[Dict]:
-        """Generic extraction for unknown platforms"""
-        ydl_opts = {
-            'quiet': True,
-            'format': 'best[ext=mp4]/best',
-            'noplaylist': True,
-            'age_limit': 99,
-            'geo_bypass': True,
-            'http_headers': self.session.headers
+    async def _get_spotify_metadata(self, url: str) -> Optional[Union[Dict, List[Dict]]]:
+        """Get Spotify metadata (placeholder implementation)"""
+        # This is a simplified implementation
+        # In production, you'd use Spotify Web API or web scraping
+        return {
+            'name': 'Unknown Track',
+            'artist': 'Unknown Artist'
         }
-        
-        try:
-            loop = asyncio.get_event_loop()
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(None, ydl.extract_info, url, False)
-                return self._format_track_info(info, 'generic')
-                
-        except Exception as e:
-            logger.error(f"Generic extraction error: {e}")
-            return await self._direct_url_extract(url)
     
-    async def _direct_url_extract(self, url: str) -> Optional[Dict]:
-        """Direct URL extraction for media files"""
-        try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, self.session.head, url
-            )
-            
-            content_type = response.headers.get('content-type', '').lower()
-            if any(media_type in content_type for media_type in ['audio', 'video']):
-                return {
-                    'title': url.split('/')[-1],
-                    'url': url,
-                    'duration': 0,
-                    'source': 'direct',
-                    'is_video': 'video' in content_type
-                }
-        except Exception as e:
-            logger.error(f"Direct URL extraction error: {e}")
-        
-        return None
-    
-    def _format_track_info(self, info: Dict, source: str) -> Dict:
+    def _format_track_info(self, info: Dict) -> Dict:
         """Format track information consistently"""
         return {
             'title': info.get('title', 'Unknown Track'),
@@ -250,75 +242,15 @@ class UniversalMediaExtractor:
             'duration': info.get('duration', 0),
             'url': info.get('url', ''),
             'thumbnail': info.get('thumbnail'),
-            'source': source,
+            'source': 'youtube',
             'is_video': info.get('vcodec') != 'none',
             'quality': info.get('format_note', 'Unknown'),
             'views': info.get('view_count', 0),
             'upload_date': info.get('upload_date'),
             'description': info.get('description', ''),
             'webpage_url': info.get('webpage_url', ''),
-            'extractor': info.get('extractor', source)
+            'extractor': info.get('extractor', 'youtube')
         }
-    
-    async def _search_youtube(self, query: str) -> Optional[Dict]:
-        """Search YouTube and return first result"""
-        try:
-            search_url = f"ytsearch1:{query}"
-            result = await self._extract_youtube(search_url, audio_only=True)
-            if isinstance(result, list) and result:
-                return result[0]
-            return result
-        except Exception as e:
-            logger.error(f"YouTube search error: {e}")
-            return None
-    
-    def _extract_spotify_id(self, url: str) -> Optional[str]:
-        """Extract Spotify ID from URL"""
-        patterns = [
-            r'spotify\.com/track/([a-zA-Z0-9]+)',
-            r'spotify\.com/playlist/([a-zA-Z0-9]+)',
-            r'spotify\.com/album/([a-zA-Z0-9]+)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, url)
-            if match:
-                return match.group(1)
-        return None
-    
-    async def _get_spotify_metadata(self, spotify_id: str, url: str) -> Optional[Union[Dict, List[Dict]]]:
-        """Get Spotify metadata (placeholder - implement with Spotify API or scraping)"""
-        # This would typically use Spotify Web API or web scraping
-        # For now, return a basic structure
-        return {
-            'name': 'Unknown Track',
-            'artist': 'Unknown Artist'
-        }
-    
-    # Placeholder methods for other platforms
-    async def _extract_soundcloud(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_instagram(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_tiktok(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_twitter(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_facebook(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_vimeo(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_dailymotion(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
-    
-    async def _extract_twitch(self, url: str, **kwargs) -> Optional[Dict]:
-        return await self._extract_generic(url, **kwargs)
 
 # Global extractor instance
 universal_extractor = UniversalMediaExtractor()

@@ -1,15 +1,30 @@
 import logging
+import asyncio
 from pyrogram import Client
 from tgcaller import TgCaller
 from .config import Config
 
-# Configure logging
+# Configure logging with colors
+import colorlog
+
+handler = colorlog.StreamHandler()
+handler.setFormatter(colorlog.ColoredFormatter(
+    '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    log_colors={
+        'DEBUG': 'cyan',
+        'INFO': 'green',
+        'WARNING': 'yellow',
+        'ERROR': 'red',
+        'CRITICAL': 'red,bg_white',
+    }
+))
+
 logging.basicConfig(
     level=getattr(logging, Config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(Config.LOG_FILE),
-        logging.StreamHandler()
+        handler,
+        logging.FileHandler(Config.LOG_FILE)
     ]
 )
 
@@ -20,6 +35,8 @@ if not Config.validate():
     logger.error("❌ Configuration validation failed. Exiting...")
     exit(1)
 
+logger.info("🎵 Initializing JhoomMusic Bot...")
+
 # Initialize Pyrogram client
 app = Client(
     "JhoomMusicBot",
@@ -29,6 +46,7 @@ app = Client(
     plugins=dict(root="jhoommusic.plugins")
 )
 
-# Initialize TgCaller
-tgcaller = TgCaller(app)
+# Initialize TgCaller with proper configuration
+tgcaller = TgCaller(app, log_level=logging.INFO)
 
+logger.info("✅ Bot and TgCaller initialized successfully")

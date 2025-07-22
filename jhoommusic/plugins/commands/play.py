@@ -2,10 +2,8 @@ import logging
 from pyrogram import filters
 from pyrogram.types import Message
 from ...core.bot import app
-from ...core.media_extractor import universal_extractor
-from ...core.playback import playback_manager
-from ...core.queue import queue_manager
-from ...core.thumbnail import generate_thumbnail
+from ...core.stream_manager import stream_manager
+from ...core.database import db
 from ...constants.images import UI_IMAGES
 from ...utils.helpers import is_user_gbanned, check_user_auth, save_user_to_db, save_chat_to_db
 
@@ -15,6 +13,8 @@ logger = logging.getLogger(__name__)
 async def play_music(_, message: Message):
     """Handle /play command"""
     try:
+        logger.info(f"🎵 Play command from {message.from_user.id} in {message.chat.id}")
+        
         # Save user and chat to database
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
@@ -27,8 +27,7 @@ async def play_music(_, message: Message):
             )
             return
         
-        # Check if user is authorized
-        # Skip auth check if database is disabled
+        # Check if user is authorized (skip if database disabled)
         if db.enabled and not await check_user_auth(message.from_user.id):
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
@@ -49,107 +48,85 @@ async def play_music(_, message: Message):
         # Handle replied audio/video files
         if message.reply_to_message and (message.reply_to_message.audio or message.reply_to_message.video):
             file = message.reply_to_message.audio or message.reply_to_message.video
-            file_path = await app.download_media(file)
             
-            track = {
-                'title': file.title or file.file_name or "Telegram Media",
-                'artist': 'Telegram Media',
-                'duration': file.duration or 0,
-                'url': file_path,
-                'source': 'telegram',
-                'is_video': bool(message.reply_to_message.video),
-                'user_id': message.from_user.id,
-                'thumbnail': None
-            }
-        else:
-            # Extract query from command
-            query = " ".join(message.command[1:])
+            # Send processing message
+            processing_msg = await message.reply("🔄 **Processing file...**")
             
-            # Extract media info using universal extractor
-            track_info = await universal_extractor.extract(query, audio_only=True)
-            if not track_info:
-                await message.reply_photo(
-                    photo=UI_IMAGES["error"],
-                    caption="❌ Could not find the requested track"
+            try:
+                file_path = await app.download_media(file)
+                logger.info(f"📁 Downloaded file: {file_path}")
+                
+                # Start streaming
+                success = await stream_manager.start_stream(
+                    chat_id, 
+                    file_path,
+                    audio_only=not bool(message.reply_to_message.video)
                 )
-                return
-            
-            # Handle playlist
-            if isinstance(track_info, list):
-                if not track_info:
-                    await message.reply_photo(
-                        photo=UI_IMAGES["error"],
-                        caption="❌ No tracks found in playlist"
-                    )
-                    return
                 
-                # Add user_id to all tracks
-                for track in track_info:
-                    track['user_id'] = message.from_user.id
-                
-                # Play first track or add to queue
-                if playback_manager.is_playing(chat_id):
-                    for track in track_info:
-                        await queue_manager.add_to_queue(chat_id, track)
-                    
-                    await message.reply_photo(
-                        photo=UI_IMAGES["success"],
-                        caption=f"🎧 Added {len(track_info)} tracks to queue"
+                if success:
+                    await processing_msg.edit_text(
+                        f"▶️ **Now Playing**\n\n"
+                        f"**Title:** {file.title or file.file_name or 'Telegram Media'}\n"
+                        f"**Type:** {'Video' if message.reply_to_message.video else 'Audio'}\n"
+                        f"**Requested by:** {message.from_user.mention}"
                     )
                 else:
-                    # Play first track
-                    await playback_manager.play_track(chat_id, track_info[0])
-                    
-                    # Add remaining tracks to queue
-                    for track in track_info[1:]:
-                        await queue_manager.add_to_queue(chat_id, track)
-                    
-                    await message.reply_photo(
-                        photo=UI_IMAGES["success"],
-                        caption=f"▶️ Now Playing: {track_info[0]['title']}\n🎧 Added {len(track_info)-1} more tracks to queue"
-                    )
-                return
+                    await processing_msg.edit_text("❌ Failed to start playback")
+                
+            except Exception as e:
+                logger.error(f"❌ File processing error: {e}")
+                await processing_msg.edit_text(f"❌ Error processing file: {str(e)}")
             
-            # Single track
-            track = track_info
-            track['user_id'] = message.from_user.id
+            return
         
-        # Generate thumbnail
-        thumb = await generate_thumbnail(
-            title=track['title'],
-            artist=track.get('artist', 'Unknown Artist'),
-            duration=track.get('duration', 0),
-            cover_url=track.get('thumbnail'),
-            requester_id=message.from_user.id
-        )
+        # Extract query from command
+        query = " ".join(message.command[1:])
+        logger.info(f"🔍 Search query: {query}")
         
-        # Play or add to queue
-        if playback_manager.is_playing(chat_id):
-            await queue_manager.add_to_queue(chat_id, track)
-            await message.reply_photo(
-                photo=thumb,
-                caption=f"🎧 **Added to queue**\n\n**Title:** {track['title']}\n**Artist:** {track.get('artist', 'Unknown')}"
+        # Send processing message
+        processing_msg = await message.reply("🔄 **Searching and processing...**")
+        
+        try:
+            # Start streaming
+            success = await stream_manager.start_stream(
+                chat_id, 
+                query,
+                audio_only=True
             )
-        else:
-            await playback_manager.play_track(chat_id, track)
-            await message.reply_photo(
-                photo=thumb,
-                caption=f"▶️ **Now Playing**\n\n**Title:** {track['title']}\n**Artist:** {track.get('artist', 'Unknown')}"
-            )
+            
+            if success:
+                stream_info = stream_manager.get_stream_info(chat_id)
+                if stream_info:
+                    info = stream_info['info']
+                    await processing_msg.edit_text(
+                        f"▶️ **Now Playing**\n\n"
+                        f"**Title:** {info.get('title', 'Unknown')}\n"
+                        f"**Artist:** {info.get('artist', 'Unknown')}\n"
+                        f"**Duration:** {info.get('duration', 0)} seconds\n"
+                        f"**Source:** {info.get('source', 'Unknown').title()}\n"
+                        f"**Requested by:** {message.from_user.mention}"
+                    )
+                else:
+                    await processing_msg.edit_text("▶️ **Playback started!**")
+            else:
+                await processing_msg.edit_text("❌ Failed to start playback. Please try again.")
         
-        logger.info(f"Play command used by {message.from_user.id} in {chat_id}: {track['title']}")
+        except Exception as e:
+            logger.error(f"❌ Play command error: {e}")
+            await processing_msg.edit_text(f"❌ Error: {str(e)}")
+        
+        logger.info(f"✅ Play command completed for {message.from_user.id}")
         
     except Exception as e:
-        logger.error(f"Error in play command: {e}")
-        await message.reply_photo(
-            photo=UI_IMAGES["error"],
-            caption=f"❌ An error occurred: {str(e)}"
-        )
+        logger.error(f"❌ Critical error in play command: {e}")
+        await message.reply(f"❌ Critical error: {str(e)}")
 
 @app.on_message(filters.command(["vplay", "vp"]) & filters.group)
 async def video_play(_, message: Message):
     """Handle /vplay command for video playback"""
     try:
+        logger.info(f"📺 VPlay command from {message.from_user.id} in {message.chat.id}")
+        
         # Save user and chat to database
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
@@ -162,8 +139,7 @@ async def video_play(_, message: Message):
             )
             return
         
-        # Check if user is authorized
-        # Skip auth check if database is disabled
+        # Check if user is authorized (skip if database disabled)
         if db.enabled and not await check_user_auth(message.from_user.id):
             await message.reply_photo(
                 photo=UI_IMAGES["error"],
@@ -182,46 +158,98 @@ async def video_play(_, message: Message):
         query = " ".join(message.command[1:])
         chat_id = message.chat.id
         
-        # Extract video info using universal extractor
-        video_info = await universal_extractor.extract(query, audio_only=False)
-        if not video_info:
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="❌ Could not find the requested video"
+        logger.info(f"🔍 Video search query: {query}")
+        
+        # Send processing message
+        processing_msg = await message.reply("🔄 **Searching and processing video...**")
+        
+        try:
+            # Start video streaming
+            success = await stream_manager.start_stream(
+                chat_id, 
+                query,
+                video=True,
+                audio_only=False
             )
-            return
+            
+            if success:
+                stream_info = stream_manager.get_stream_info(chat_id)
+                if stream_info:
+                    info = stream_info['info']
+                    await processing_msg.edit_text(
+                        f"📺 **Now Playing Video**\n\n"
+                        f"**Title:** {info.get('title', 'Unknown')}\n"
+                        f"**Artist:** {info.get('artist', 'Unknown')}\n"
+                        f"**Duration:** {info.get('duration', 0)} seconds\n"
+                        f"**Source:** {info.get('source', 'Unknown').title()}\n"
+                        f"**Requested by:** {message.from_user.mention}"
+                    )
+                else:
+                    await processing_msg.edit_text("📺 **Video playback started!**")
+            else:
+                await processing_msg.edit_text("❌ Failed to start video playback. Please try again.")
         
-        video_info['is_video'] = True
-        video_info['user_id'] = message.from_user.id
+        except Exception as e:
+            logger.error(f"❌ VPlay command error: {e}")
+            await processing_msg.edit_text(f"❌ Error: {str(e)}")
         
-        # Generate thumbnail
-        thumb = await generate_thumbnail(
-            title=video_info['title'],
-            artist=video_info.get('artist', 'Unknown Artist'),
-            duration=video_info.get('duration', 0),
-            cover_url=video_info.get('thumbnail'),
-            requester_id=message.from_user.id
-        )
-        
-        # Play or add to queue
-        if playback_manager.is_playing(chat_id):
-            await queue_manager.add_to_queue(chat_id, video_info)
-            await message.reply_photo(
-                photo=thumb,
-                caption=f"🎬 **Added to queue**\n\n**Title:** {video_info['title']}\n**Artist:** {video_info.get('artist', 'Unknown')}"
-            )
-        else:
-            await playback_manager.play_track(chat_id, video_info)
-            await message.reply_photo(
-                photo=thumb,
-                caption=f"🎬 **Now Playing**\n\n**Title:** {video_info['title']}\n**Artist:** {video_info.get('artist', 'Unknown')}"
-            )
-        
-        logger.info(f"VPlay command used by {message.from_user.id} in {chat_id}: {video_info['title']}")
+        logger.info(f"✅ VPlay command completed for {message.from_user.id}")
         
     except Exception as e:
-        logger.error(f"Error in vplay command: {e}")
-        await message.reply_photo(
-            photo=UI_IMAGES["error"],
-            caption=f"❌ An error occurred: {str(e)}"
-        )
+        logger.error(f"❌ Critical error in vplay command: {e}")
+        await message.reply(f"❌ Critical error: {str(e)}")
+
+@app.on_message(filters.command(["stream"]) & filters.group)
+async def stream_command(_, message: Message):
+    """Handle /stream command (alias for play)"""
+    # Redirect to play command
+    message.command[0] = "play"
+    await play_music(_, message)
+
+@app.on_message(filters.command(["join"]) & filters.group)
+async def join_command(_, message: Message):
+    """Handle /join command"""
+    try:
+        logger.info(f"📞 Join command from {message.from_user.id} in {message.chat.id}")
+        
+        chat_id = message.chat.id
+        
+        # Send processing message
+        processing_msg = await message.reply("🔄 **Joining voice chat...**")
+        
+        success = await stream_manager.join_call(chat_id)
+        
+        if success:
+            await processing_msg.edit_text("✅ **Successfully joined voice chat!**")
+        else:
+            await processing_msg.edit_text("❌ **Failed to join voice chat.**")
+        
+        logger.info(f"✅ Join command completed: {success}")
+        
+    except Exception as e:
+        logger.error(f"❌ Join command error: {e}")
+        await message.reply(f"❌ Error: {str(e)}")
+
+@app.on_message(filters.command(["leave"]) & filters.group)
+async def leave_command(_, message: Message):
+    """Handle /leave command"""
+    try:
+        logger.info(f"👋 Leave command from {message.from_user.id} in {message.chat.id}")
+        
+        chat_id = message.chat.id
+        
+        # Send processing message
+        processing_msg = await message.reply("🔄 **Leaving voice chat...**")
+        
+        success = await stream_manager.leave_call(chat_id)
+        
+        if success:
+            await processing_msg.edit_text("👋 **Left voice chat successfully!**")
+        else:
+            await processing_msg.edit_text("❌ **Failed to leave voice chat.**")
+        
+        logger.info(f"✅ Leave command completed: {success}")
+        
+    except Exception as e:
+        logger.error(f"❌ Leave command error: {e}")
+        await message.reply(f"❌ Error: {str(e)}")

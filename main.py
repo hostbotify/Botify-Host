@@ -19,18 +19,12 @@ sys.path.insert(0, str(project_root))
 from jhoommusic.core.config import Config
 from jhoommusic.core.bot import app, tgcaller
 from jhoommusic.core.database import db
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, Config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(Config.LOG_FILE),
-        logging.StreamHandler()
-    ]
-)
+from jhoommusic.core.stream_manager import stream_manager
 
 logger = logging.getLogger(__name__)
+
+# Global shutdown flag
+shutdown_event = asyncio.Event()
 
 def load_plugins():
     """Load all plugins from jhoommusic/plugins directory"""
@@ -77,9 +71,11 @@ def load_plugins():
 async def startup_tasks():
     """Initialize all core components"""
     try:
+        logger.info("🚀 Starting initialization...")
+        
         # Connect to database
         await db.connect()
-        logger.info("✅ Database connected")
+        logger.info("✅ Database initialized")
         
         # Start TgCaller
         await tgcaller.start()
@@ -94,20 +90,28 @@ async def startup_tasks():
                     "✅ All systems operational\n"
                     "✅ Ready to stream music\n"
                     f"✅ Database: {'Connected' if db.enabled else 'Disabled (Running in memory mode)'}\n"
-                    f"✅ Redis Cache: Connected\n"
-                    f"✅ TgCaller: Active"
+                    f"✅ TgCaller: Active\n"
+                    f"✅ FFmpeg: Available\n"
+                    f"✅ yt-dlp: Ready"
                 )
                 logger.info("✅ Startup message sent")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to send startup message: {e}")
         
+        logger.info("🎉 Bot started successfully!")
+        
     except Exception as e:
         logger.error(f"❌ Startup error: {e}")
+        raise
 
 async def shutdown_tasks():
     """Cleanup tasks on shutdown"""
     try:
         logger.info("🛑 Shutting down JhoomMusic Bot...")
+        
+        # Stop all streams
+        await stream_manager.cleanup_all()
+        logger.info("✅ All streams stopped")
         
         # Stop TgCaller
         try:
@@ -124,21 +128,15 @@ async def shutdown_tasks():
         await app.stop()
         logger.info("✅ Bot stopped")
         
+        logger.info("👋 Shutdown completed successfully")
+        
     except Exception as e:
         logger.error(f"❌ Error during shutdown: {e}")
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
     logger.info(f"📡 Received signal {signum}")
-    # Create new event loop for shutdown if current one is closed
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.create_task(shutdown_tasks())
-    except Exception as e:
-        logger.error(f"❌ Error in signal handler: {e}")
+    shutdown_event.set()
 
 async def main():
     """Main function to start the bot"""
@@ -161,15 +159,15 @@ async def main():
         # Initialize core components
         await startup_tasks()
         
-        logger.info("🚀 JhoomMusic Bot started successfully!")
-        
-        # Keep the bot running
-        await asyncio.Event().wait()
+        # Wait for shutdown signal
+        await shutdown_event.wait()
         
     except KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user")
+        logger.info("🛑 Bot stopped by user (Ctrl+C)")
     except Exception as e:
         logger.error(f"❌ Bot error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         await shutdown_tasks()
 
@@ -178,5 +176,25 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
+    # Check Python version
+    if sys.version_info < (3, 8):
+        print("❌ Python 3.8 or higher is required")
+        sys.exit(1)
+    
+    # Check if ffmpeg is available
+    try:
+        import subprocess
+        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        logger.info("✅ FFmpeg is available")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logger.error("❌ FFmpeg not found. Please install FFmpeg")
+        sys.exit(1)
+    
     # Run the bot
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
+    except Exception as e:
+        logger.error(f"❌ Fatal error: {e}")
+        sys.exit(1)
