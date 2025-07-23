@@ -21,12 +21,12 @@ async def pause_music(_, message: Message):
         
         # Check if streaming
         if not stream_manager.is_streaming(chat_id):
-            await message.reply("❌ No active stream to pause")
+            await message.reply("❌ No active stream to pause. Use /play [song] first.")
             return
         
         # Check if user is admin
         if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can use this command")
+            await message.reply("❌ Only admins can control playback")
             return
         
         # Send processing message
@@ -59,7 +59,7 @@ async def resume_music(_, message: Message):
         
         # Check if user is admin
         if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can use this command")
+            await message.reply("❌ Only admins can control playback")
             return
         
         # Send processing message
@@ -92,7 +92,7 @@ async def stop_music(_, message: Message):
         
         # Check if user is admin
         if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can use this command")
+            await message.reply("❌ Only admins can control playback")
             return
         
         # Send processing message

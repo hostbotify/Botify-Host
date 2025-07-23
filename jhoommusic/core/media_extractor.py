@@ -29,16 +29,16 @@ class UniversalMediaExtractor:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'age_limit': 99,
             'geo_bypass': True,
             'geo_bypass_country': 'US',
             'socket_timeout': 30,
             'http_headers': self.session.headers,
+            'format': 'best[height<=720]/best',
+            'noplaylist': True,
             'extractor_args': {
                 'youtube': {
-                    'skip': ['dash'],
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['configs']
+                    'skip': ['dash', 'hls'],
+                    'player_client': ['android', 'web']
                 }
             }
         }
@@ -159,7 +159,7 @@ class UniversalMediaExtractor:
         """Get format selector for yt-dlp optimized for TgCaller"""
         if audio_only:
             # Prefer formats that work well with TgCaller
-            return 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]'
+            return 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best[height<=480]'
         else:
             # Video formats optimized for streaming
             return 'best[height<=720][ext=mp4]/best[height<=480][ext=mp4]/best[ext=mp4]/best'

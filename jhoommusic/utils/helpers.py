@@ -78,7 +78,7 @@ async def check_user_auth(user_id: int) -> bool:
         return await db.auth_users.find_one({"user_id": user_id}) is not None
     except Exception as e:
         logger.error(f"Error checking auth status: {e}")
-        return True  # Allow on error
+        return True  # Allow all users on error (for testing)
 
 def extract_chat_id(message: Message) -> int:
     """Extract chat ID from message text or reply"""

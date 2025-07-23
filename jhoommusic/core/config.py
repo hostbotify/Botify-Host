@@ -49,15 +49,14 @@ class Config:
             ("API_ID", cls.API_ID),
             ("API_HASH", cls.API_HASH),
             ("BOT_TOKEN", cls.BOT_TOKEN),
-            ("MONGO_URI", cls.MONGO_URI),
-            ("SUPER_GROUP_ID", cls.SUPER_GROUP_ID),
-            ("SUPER_GROUP_USERNAME", cls.SUPER_GROUP_USERNAME)
+            ("MONGO_URI", cls.MONGO_URI)
         ]
         
         missing = []
         for var_name, var_value in required_vars:
             if not var_value or (isinstance(var_value, int) and var_value == 0):
-                missing.append(var_name)
+                if var_name not in ["SUPER_GROUP_ID", "SUPER_GROUP_USERNAME"]:  # These are optional
+                    missing.append(var_name)
         
         if missing:
             logging.error(f"Missing required environment variables: {', '.join(missing)}")

@@ -47,6 +47,31 @@ cp .env.example .env
 python main.py
 ```
 
+### Quick Test Commands
+
+After setup, test the bot with these commands:
+
+```bash
+# Test basic functionality
+python test_simple_play.py
+
+# Test streaming
+python test_streaming.py
+
+# Test TgCaller
+python test_tgcaller.py
+```
+
+### Bot Commands for Testing
+
+- `/testplay [song name]` - Simple test play command (no auth required)
+- `/play [song name]` - Regular play command
+- `/join` - Join voice chat
+- `/leave` - Leave voice chat
+- `/pause` - Pause playback
+- `/resume` - Resume playback
+- `/stop` - Stop playback
+
 ## ⚙️ Configuration
 
 ### Required Environment Variables

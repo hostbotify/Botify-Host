@@ -21,26 +21,17 @@ async def play_music(_, message: Message):
         
         # Check if user is banned
         if await is_user_gbanned(message.from_user.id):
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="🚫 You are banned from using this bot."
-            )
+            await message.reply("🚫 You are banned from using this bot.")
             return
         
         # Check if user is authorized (skip if database disabled)
         if db.enabled and not await check_user_auth(message.from_user.id):
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="🔒 You need to be authorized to use this command."
-            )
+            await message.reply("🔒 You need to be authorized to use this command.")
             return
         
         # Check if query is provided
         if len(message.command) < 2 and not message.reply_to_message:
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="**Usage:** `/play [song name or URL]` or reply to an audio file"
-            )
+            await message.reply("**Usage:** `/play [song name or URL]` or reply to an audio file")
             return
         
         chat_id = message.chat.id
@@ -134,6 +125,59 @@ async def play_music(_, message: Message):
         
     except Exception as e:
         logger.error(f"❌ Critical error in play command: {e}")
+        await message.reply(f"❌ Critical error: {str(e)}")
+
+# Add a simple play command that works without authorization for testing
+@app.on_message(filters.command(["testplay"]) & filters.group)
+async def test_play_music(_, message: Message):
+    """Handle /testplay command - simplified version for testing"""
+    try:
+        logger.info(f"🧪 Test play command from {message.from_user.id} in {message.chat.id}")
+        
+        # Check if query is provided
+        if len(message.command) < 2:
+            await message.reply("**Usage:** `/testplay [song name or URL]`")
+            return
+        
+        query = " ".join(message.command[1:])
+        chat_id = message.chat.id
+        
+        logger.info(f"🔍 Test search query: {query}")
+        
+        # Send processing message
+        processing_msg = await message.reply("🔄 **Testing playback...**")
+        
+        try:
+            # Start streaming
+            success = await stream_manager.start_stream(
+                chat_id, 
+                query,
+                audio_only=True
+            )
+            
+            if success:
+                await processing_msg.edit_text(
+                    f"✅ **Test Playback Started!**\n\n"
+                    f"**Query:** {query}\n"
+                    f"**Chat:** {chat_id}\n"
+                    f"**User:** {message.from_user.mention}\n\n"
+                    f"Use /pause, /resume, /stop for controls"
+                )
+            else:
+                await processing_msg.edit_text(
+                    "❌ **Test playback failed**\n\n"
+                    "Check:\n"
+                    "• Bot has admin rights\n"
+                    "• Voice chat is active\n"
+                    "• Try /join first"
+                )
+        
+        except Exception as e:
+            logger.error(f"❌ Test play error: {e}")
+            await processing_msg.edit_text(f"❌ **Test error:** {str(e)[:200]}")
+        
+    except Exception as e:
+        logger.error(f"❌ Critical test play error: {e}")
         await message.reply(f"❌ Critical error: {str(e)}")
 
 @app.on_message(filters.command(["vplay", "vp"]) & filters.group)
