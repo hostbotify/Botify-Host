@@ -1,11 +1,9 @@
 import logging
 from pyrogram import filters
 from pyrogram.types import Message
-from ...core.bot import app
-from ...core.stream_manager import stream_manager
-from ...core.database import db
-from ...constants.images import UI_IMAGES
-from ...utils.helpers import is_user_gbanned, check_user_auth, save_user_to_db, save_chat_to_db
+from ..core.bot import app
+from ..core.stream_manager import stream_manager
+from ..utils.helpers import save_user_to_db, save_chat_to_db
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +11,11 @@ logger = logging.getLogger(__name__)
 async def play_music(_, message: Message):
     """Handle /play command"""
     try:
-        logger.info(f"🎵 PLAY COMMAND RECEIVED from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"🎵 PLAY COMMAND from {message.from_user.id} in {message.chat.id}")
         
         # Save user and chat to database
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
-        
-        # Check if user is banned
-        if await is_user_gbanned(message.from_user.id):
-            await message.reply_text("🚫 You are banned from using this bot.")
-            return
-        
-        # Skip auth check for now to allow testing
-        # if db.enabled and not await check_user_auth(message.from_user.id):
-        #     await message.reply_text("🔒 You need to be authorized to use this command.")
-        #     return
         
         # Check if query is provided
         if len(message.command) < 2 and not message.reply_to_message:
@@ -41,14 +29,12 @@ async def play_music(_, message: Message):
         if message.reply_to_message and (message.reply_to_message.audio or message.reply_to_message.video):
             file = message.reply_to_message.audio or message.reply_to_message.video
             
-            # Send processing message
             processing_msg = await message.reply_text("🔄 **Processing file...**")
             
             try:
                 file_path = await app.download_media(file)
                 logger.info(f"📁 Downloaded file: {file_path}")
                 
-                # Start streaming
                 success = await stream_manager.start_stream(
                     chat_id, 
                     file_path,
@@ -67,6 +53,8 @@ async def play_music(_, message: Message):
                 
             except Exception as e:
                 logger.error(f"❌ File processing error: {e}")
+                import traceback
+                traceback.print_exc()
                 await processing_msg.edit_text(f"❌ Error processing file: {str(e)}")
             
             return
@@ -81,7 +69,6 @@ async def play_music(_, message: Message):
         try:
             logger.info(f"🎵 Starting stream for: {query}")
             
-            # Start streaming with audio-only mode
             success = await stream_manager.start_stream(
                 chat_id, 
                 query,
@@ -128,7 +115,7 @@ async def play_music(_, message: Message):
                 f"• Use a different song/URL"
             )
         
-        logger.info(f"✅ PLAY COMMAND COMPLETED for {message.from_user.id}")
+        logger.info(f"✅ PLAY COMMAND completed for {message.from_user.id}")
         
     except Exception as e:
         logger.error(f"❌ Critical error in play command: {e}")
@@ -136,14 +123,12 @@ async def play_music(_, message: Message):
         traceback.print_exc()
         await message.reply_text(f"❌ Critical error: {str(e)}")
 
-# Add a simple play command that works without authorization for testing
 @app.on_message(filters.command(["testplay"]) & filters.group)
 async def test_play_music(_, message: Message):
     """Handle /testplay command - simplified version for testing"""
     try:
-        logger.info(f"🧪 TESTPLAY COMMAND RECEIVED from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"🧪 TESTPLAY COMMAND from {message.from_user.id} in {message.chat.id}")
         
-        # Check if query is provided
         if len(message.command) < 2:
             await message.reply_text("**Usage:** `/testplay [song name or URL]`")
             return
@@ -153,13 +138,11 @@ async def test_play_music(_, message: Message):
         
         logger.info(f"🔍 TEST SEARCH QUERY: {query}")
         
-        # Send processing message
         processing_msg = await message.reply_text("🔄 **Testing playback...**")
         
         try:
             logger.info(f"🧪 Starting test stream for: {query}")
             
-            # Start streaming
             success = await stream_manager.start_stream(
                 chat_id, 
                 query,
@@ -201,34 +184,13 @@ async def test_play_music(_, message: Message):
 async def video_play(_, message: Message):
     """Handle /vplay command for video playback"""
     try:
-        logger.info(f"📺 VPlay command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"📺 VPLAY COMMAND from {message.from_user.id} in {message.chat.id}")
         
-        # Save user and chat to database
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
         
-        # Check if user is banned
-        if await is_user_gbanned(message.from_user.id):
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="🚫 You are banned from using this bot."
-            )
-            return
-        
-        # Check if user is authorized (skip if database disabled)
-        if db.enabled and not await check_user_auth(message.from_user.id):
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="🔒 You need to be authorized to use this command."
-            )
-            return
-        
-        # Check if query is provided
         if len(message.command) < 2:
-            await message.reply_photo(
-                photo=UI_IMAGES["error"],
-                caption="**Usage:** `/vplay [video name or URL]`"
-            )
+            await message.reply_text("**Usage:** `/vplay [video name or URL]`")
             return
         
         query = " ".join(message.command[1:])
@@ -236,11 +198,9 @@ async def video_play(_, message: Message):
         
         logger.info(f"🔍 Video search query: {query}")
         
-        # Send processing message
         processing_msg = await message.reply("🔄 **Searching and processing video...**")
         
         try:
-            # Start video streaming
             success = await stream_manager.start_stream(
                 chat_id, 
                 query,
@@ -275,6 +235,8 @@ async def video_play(_, message: Message):
         
         except Exception as e:
             logger.error(f"❌ VPlay command error: {e}")
+            import traceback
+            traceback.print_exc()
             await processing_msg.edit_text(
                 f"❌ **Video error occurred**\n\n"
                 f"**Details:** {str(e)[:200]}\n\n"
@@ -284,28 +246,22 @@ async def video_play(_, message: Message):
                 f"• Use a different video/URL"
             )
         
-        logger.info(f"✅ VPlay command completed for {message.from_user.id}")
+        logger.info(f"✅ VPLAY COMMAND completed for {message.from_user.id}")
         
     except Exception as e:
         logger.error(f"❌ Critical error in vplay command: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Critical error: {str(e)}")
-
-@app.on_message(filters.command(["stream"]) & filters.group)
-async def stream_command(_, message: Message):
-    """Handle /stream command (alias for play)"""
-    # Redirect to play command
-    message.command[0] = "play"
-    await play_music(_, message)
 
 @app.on_message(filters.command(["join"]) & filters.group)
 async def join_command(_, message: Message):
     """Handle /join command"""
     try:
-        logger.info(f"📞 JOIN COMMAND RECEIVED from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"📞 JOIN COMMAND from {message.from_user.id} in {message.chat.id}")
         
         chat_id = message.chat.id
         
-        # Send processing message
         processing_msg = await message.reply_text("🔄 **Joining voice chat...**")
         
         logger.info(f"📞 Attempting to join voice chat in {chat_id}")
@@ -329,7 +285,7 @@ async def join_command(_, message: Message):
                 "• Bot can manage voice chats"
             )
         
-        logger.info(f"✅ JOIN COMMAND COMPLETED: {success}")
+        logger.info(f"✅ JOIN COMMAND completed: {success}")
         
     except Exception as e:
         logger.error(f"❌ Join command error: {e}")
@@ -341,11 +297,10 @@ async def join_command(_, message: Message):
 async def leave_command(_, message: Message):
     """Handle /leave command"""
     try:
-        logger.info(f"👋 Leave command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"👋 LEAVE COMMAND from {message.from_user.id} in {message.chat.id}")
         
         chat_id = message.chat.id
         
-        # Send processing message
         processing_msg = await message.reply("🔄 **Leaving voice chat...**")
         
         success = await stream_manager.leave_call(chat_id)
@@ -355,8 +310,10 @@ async def leave_command(_, message: Message):
         else:
             await processing_msg.edit_text("❌ **Failed to leave voice chat.**")
         
-        logger.info(f"✅ Leave command completed: {success}")
+        logger.info(f"✅ LEAVE COMMAND completed: {success}")
         
     except Exception as e:
         logger.error(f"❌ Leave command error: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Error: {str(e)}")

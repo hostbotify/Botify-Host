@@ -8,7 +8,6 @@ import os
 import sys
 import asyncio
 import logging
-import importlib
 import signal
 from pathlib import Path
 
@@ -26,54 +25,26 @@ logger = logging.getLogger(__name__)
 # Global shutdown flag
 shutdown_event = asyncio.Event()
 
-def load_plugins():
-    """Load all plugins from jhoommusic/plugins directory"""
-    plugins_path = os.path.join(os.path.dirname(__file__), "jhoommusic", "plugins")
-    
-    if not os.path.exists(plugins_path):
-        logger.error(f"❌ Plugins directory not found: {plugins_path}")
-        return
-    
-    # Import the main plugins module to ensure all handlers are registered
+def register_handlers():
+    """Register all handlers manually"""
     try:
-        import jhoommusic.plugins
-        logger.info("✅ Main plugins module imported")
+        logger.info("🔧 Registering handlers manually...")
+        
+        # Import all handlers to register them
+        from jhoommusic.handlers import (
+            start_handler,
+            play_handler, 
+            control_handler,
+            admin_handler,
+            callback_handler
+        )
+        
+        logger.info("✅ All handlers registered successfully")
+        
     except Exception as e:
-        logger.error(f"❌ Failed to import main plugins module: {e}")
-    
-    # Load command plugins
-    commands_path = os.path.join(plugins_path, "commands")
-    if os.path.exists(commands_path):
-        for file in os.listdir(commands_path):
-            if file.endswith(".py") and not file.startswith("__"):
-                plugin_name = file[:-3]
-                try:
-                    importlib.import_module(f"jhoommusic.plugins.commands.{plugin_name}")
-                    logger.info(f"✅ Command plugin loaded: {plugin_name}.py")
-                except Exception as e:
-                    logger.error(f"❌ Failed to load command plugin {plugin_name}: {e}")
-    
-    # Load callback plugins
-    callbacks_path = os.path.join(plugins_path, "callbacks")
-    if os.path.exists(callbacks_path):
-        for file in os.listdir(callbacks_path):
-            if file.endswith(".py") and not file.startswith("__"):
-                plugin_name = file[:-3]
-                try:
-                    importlib.import_module(f"jhoommusic.plugins.callbacks.{plugin_name}")
-                    logger.info(f"✅ Callback plugin loaded: {plugin_name}.py")
-                except Exception as e:
-                    logger.error(f"❌ Failed to load callback plugin {plugin_name}: {e}")
-    
-    # Load root level plugins
-    for file in os.listdir(plugins_path):
-        if file.endswith(".py") and not file.startswith("__"):
-            plugin_name = file[:-3]
-            try:
-                importlib.import_module(f"jhoommusic.plugins.{plugin_name}")
-                logger.info(f"✅ Plugin loaded: {plugin_name}.py")
-            except Exception as e:
-                logger.error(f"❌ Failed to load plugin {plugin_name}: {e}")
+        logger.error(f"❌ Error registering handlers: {e}")
+        import traceback
+        traceback.print_exc()
 
 async def startup_tasks():
     """Initialize all core components"""
@@ -84,13 +55,12 @@ async def startup_tasks():
         await db.connect()
         logger.info("✅ Database initialized")
         
-        # Start TgCaller with proper error handling
+        # Start TgCaller
         try:
             await tgcaller.start()
             logger.info("✅ TgCaller started successfully")
         except Exception as e:
             logger.error(f"❌ TgCaller start error: {e}")
-            # Don't exit, TgCaller might still work
         
         # Send startup message to super group if configured
         if Config.SUPER_GROUP_ID and Config.SUPER_GROUP_ID != 0:
@@ -100,7 +70,7 @@ async def startup_tasks():
                     "🎵 **JhoomMusic Bot Started!**\n\n"
                     "✅ All systems operational\n"
                     "✅ Ready to stream music\n"
-                    f"✅ Database: {'Connected' if db.enabled else 'Disabled (Running in memory mode)'}\n"
+                    f"✅ Database: {'Connected' if db.enabled else 'Disabled'}\n"
                     f"✅ TgCaller: Active\n"
                     f"✅ FFmpeg: Available\n"
                     f"✅ yt-dlp: Ready\n\n"
@@ -173,13 +143,17 @@ async def main():
             logger.error("❌ Configuration validation failed. Exiting...")
             return
         
-        # Load all plugins
-        load_plugins()
+        # Register all handlers manually
+        register_handlers()
         
         # Start the bot
         logger.info("🤖 Bot starting...")
         await app.start()
         logger.info("✅ Bot started successfully!")
+        
+        # Get bot info
+        me = await app.get_me()
+        logger.info(f"✅ Bot info: @{me.username} ({me.first_name})")
         
         # Initialize core components
         await startup_tasks()

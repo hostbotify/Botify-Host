@@ -37,20 +37,18 @@ if not Config.validate():
 
 logger.info("🎵 Initializing JhoomMusic Bot...")
 
-# Initialize Pyrogram client
+# Initialize Pyrogram client WITHOUT plugins (we'll register manually)
 app = Client(
     "JhoomMusicBot",
     api_id=Config.API_ID,
     api_hash=Config.API_HASH,
-    bot_token=Config.BOT_TOKEN,
-    plugins=dict(root="jhoommusic.plugins", include=["commands", "callbacks", "start", "ping", "alive"])
+    bot_token=Config.BOT_TOKEN
 )
 
-# Initialize TgCaller with proper configuration for streaming
+# Initialize TgCaller
 tgcaller = TgCaller(
     app, 
     log_level=logging.INFO,
-    # Add streaming optimizations
     ffmpeg_parameters={
         'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
         'options': '-vn -preset ultrafast -tune zerolatency'

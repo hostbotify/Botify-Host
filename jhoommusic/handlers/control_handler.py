@@ -1,10 +1,9 @@
 import logging
 from pyrogram import filters
 from pyrogram.types import Message
-from ...core.bot import app
-from ...core.stream_manager import stream_manager
-from ...constants.images import UI_IMAGES
-from ...utils.helpers import is_admin_or_sudo, save_user_to_db, save_chat_to_db
+from ..core.bot import app
+from ..core.stream_manager import stream_manager
+from ..utils.helpers import is_admin_or_sudo, save_user_to_db, save_chat_to_db
 
 logger = logging.getLogger(__name__)
 
@@ -12,27 +11,19 @@ logger = logging.getLogger(__name__)
 async def pause_music(_, message: Message):
     """Handle /pause command"""
     try:
-        logger.info(f"⏸️ Pause command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"⏸️ PAUSE COMMAND from {message.from_user.id} in {message.chat.id}")
         
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
         
         chat_id = message.chat.id
         
-        # Check if streaming
         if not stream_manager.is_streaming(chat_id):
             await message.reply("❌ No active stream to pause. Use /play [song] first.")
             return
         
-        # Check if user is admin
-        if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can control playback")
-            return
-        
-        # Send processing message
         processing_msg = await message.reply("🔄 **Pausing playback...**")
         
-        # Pause stream
         success = await stream_manager.pause_stream(chat_id)
         
         if success:
@@ -40,32 +31,27 @@ async def pause_music(_, message: Message):
         else:
             await processing_msg.edit_text("❌ **Failed to pause playback**")
         
-        logger.info(f"✅ Pause command completed: {success}")
+        logger.info(f"✅ PAUSE COMMAND completed: {success}")
         
     except Exception as e:
         logger.error(f"❌ Pause command error: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Error: {str(e)}")
 
 @app.on_message(filters.command(["resume", "r"]) & filters.group)
 async def resume_music(_, message: Message):
     """Handle /resume command"""
     try:
-        logger.info(f"▶️ Resume command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"▶️ RESUME COMMAND from {message.from_user.id} in {message.chat.id}")
         
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
         
         chat_id = message.chat.id
         
-        # Check if user is admin
-        if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can control playback")
-            return
-        
-        # Send processing message
         processing_msg = await message.reply("🔄 **Resuming playback...**")
         
-        # Resume stream
         success = await stream_manager.resume_stream(chat_id)
         
         if success:
@@ -73,32 +59,27 @@ async def resume_music(_, message: Message):
         else:
             await processing_msg.edit_text("❌ **Failed to resume playback**")
         
-        logger.info(f"✅ Resume command completed: {success}")
+        logger.info(f"✅ RESUME COMMAND completed: {success}")
         
     except Exception as e:
         logger.error(f"❌ Resume command error: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Error: {str(e)}")
 
 @app.on_message(filters.command(["stop", "end"]) & filters.group)
 async def stop_music(_, message: Message):
     """Handle /stop command"""
     try:
-        logger.info(f"⏹️ Stop command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"⏹️ STOP COMMAND from {message.from_user.id} in {message.chat.id}")
         
         await save_user_to_db(message.from_user)
         await save_chat_to_db(message.chat)
         
         chat_id = message.chat.id
         
-        # Check if user is admin
-        if not await is_admin_or_sudo(chat_id, message.from_user.id):
-            await message.reply("❌ Only admins can control playback")
-            return
-        
-        # Send processing message
         processing_msg = await message.reply("🔄 **Stopping playback...**")
         
-        # Stop stream
         success = await stream_manager.stop_stream(chat_id)
         
         if success:
@@ -106,17 +87,19 @@ async def stop_music(_, message: Message):
         else:
             await processing_msg.edit_text("❌ **Failed to stop playback**")
         
-        logger.info(f"✅ Stop command completed: {success}")
+        logger.info(f"✅ STOP COMMAND completed: {success}")
         
     except Exception as e:
         logger.error(f"❌ Stop command error: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Error: {str(e)}")
 
 @app.on_message(filters.command(["status", "current"]) & filters.group)
 async def status_command(_, message: Message):
     """Handle /status command"""
     try:
-        logger.info(f"📊 Status command from {message.from_user.id} in {message.chat.id}")
+        logger.info(f"📊 STATUS COMMAND from {message.from_user.id} in {message.chat.id}")
         
         chat_id = message.chat.id
         
@@ -136,8 +119,10 @@ async def status_command(_, message: Message):
         else:
             await message.reply("📊 **Status:** 🔴 Not streaming")
         
-        logger.info(f"✅ Status command completed")
+        logger.info(f"✅ STATUS COMMAND completed")
         
     except Exception as e:
         logger.error(f"❌ Status command error: {e}")
+        import traceback
+        traceback.print_exc()
         await message.reply(f"❌ Error: {str(e)}")
