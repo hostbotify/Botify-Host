@@ -19,10 +19,15 @@ class StreamManager:
         """Start streaming with TgCaller"""
         async with self.stream_lock:
             try:
-                logger.info(f"🎵 Starting stream in chat {chat_id}: {source}")
+                logger.info(f"🎵 STREAM MANAGER: Starting stream in chat {chat_id}")
+                logger.info(f"🎵 STREAM MANAGER: Source: {source}")
+                logger.info(f"🎵 STREAM MANAGER: Options: {options}")
                 
                 # Extract media info
+                logger.info(f"🎵 STREAM MANAGER: Extracting media info...")
                 media_info = await universal_extractor.extract(source, **options)
+                logger.info(f"🎵 STREAM MANAGER: Media extraction result: {bool(media_info)}")
+                
                 if not media_info:
                     logger.error(f"❌ Failed to extract media info for: {source}")
                     return False
@@ -36,27 +41,30 @@ class StreamManager:
                 # Get stream URL
                 stream_url = media_info.get('url')
                 if not stream_url:
-                    logger.error("❌ No stream URL found")
+                    logger.error("❌ STREAM MANAGER: No stream URL found")
                     return False
                 
                 # Determine stream type
                 is_video = media_info.get('is_video', False) or options.get('video', False)
                 
-                logger.info(f"🔗 Stream URL: {stream_url[:100]}...")
-                logger.info(f"📺 Video mode: {is_video}")
+                logger.info(f"🔗 STREAM MANAGER: Stream URL: {stream_url[:100]}...")
+                logger.info(f"📺 STREAM MANAGER: Video mode: {is_video}")
                 
                 # Join voice chat first
+                logger.info(f"📞 STREAM MANAGER: Joining voice chat...")
                 try:
                     await tgcaller.join_group_call(chat_id)
-                    logger.info(f"✅ Joined voice chat: {chat_id}")
+                    logger.info(f"✅ STREAM MANAGER: Joined voice chat: {chat_id}")
                 except Exception as e:
                     if "already joined" not in str(e).lower():
-                        logger.error(f"❌ Failed to join voice chat: {e}")
+                        logger.error(f"❌ STREAM MANAGER: Failed to join voice chat: {e}")
                         return False
-                    logger.info(f"ℹ️ Already in voice chat: {chat_id}")
+                    logger.info(f"ℹ️ STREAM MANAGER: Already in voice chat: {chat_id}")
                 
                 # Start streaming with proper format
+                logger.info(f"🎵 STREAM MANAGER: Starting actual stream...")
                 success = await self._start_stream_with_format(chat_id, stream_url, media_info, is_video)
+                logger.info(f"🎵 STREAM MANAGER: Stream start result: {success}")
                 
                 if success:
                     self.active_streams[chat_id] = {
@@ -65,14 +73,16 @@ class StreamManager:
                         'url': stream_url,
                         'source': source
                     }
-                    logger.info(f"✅ Stream started successfully: {media_info['title']}")
+                    logger.info(f"✅ STREAM MANAGER: Stream started successfully: {media_info['title']}")
                 else:
-                    logger.error(f"❌ Failed to start stream")
+                    logger.error(f"❌ STREAM MANAGER: Failed to start stream")
                 
                 return success
                 
             except Exception as e:
-                logger.error(f"❌ Stream start error: {e}")
+                logger.error(f"❌ STREAM MANAGER: Stream start error: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
     
     async def _start_stream_with_format(self, chat_id: int, url: str, info: Dict, is_video: bool) -> bool:
@@ -92,19 +102,20 @@ class StreamManager:
     async def _start_audio_stream(self, chat_id: int, url: str, info: Dict) -> bool:
         """Start audio stream using TgCaller with FFmpeg pipe"""
         try:
-            logger.info(f"🎵 Starting audio stream: {info.get('title', 'Unknown')}")
+            logger.info(f"🎵 AUDIO STREAM: Starting for {info.get('title', 'Unknown')}")
+            logger.info(f"🎵 AUDIO STREAM: URL: {url[:100]}...")
             
             # Try direct URL first (simpler approach)
             try:
-                logger.info(f"🔗 Trying direct URL: {url[:100]}...")
+                logger.info(f"🔗 AUDIO STREAM: Trying direct URL...")
                 await tgcaller.play(chat_id, url)
-                logger.info(f"✅ Direct audio stream started successfully")
+                logger.info(f"✅ AUDIO STREAM: Direct stream started successfully")
                 return True
             except Exception as direct_error:
-                logger.warning(f"⚠️ Direct URL failed: {direct_error}")
+                logger.warning(f"⚠️ AUDIO STREAM: Direct URL failed: {direct_error}")
                 
                 # Fallback to FFmpeg processing
-                logger.info(f"🔄 Trying FFmpeg processing...")
+                logger.info(f"🔄 AUDIO STREAM: Trying FFmpeg processing...")
                 ffmpeg_cmd = [
                     'ffmpeg',
                     '-i', url,
@@ -116,7 +127,7 @@ class StreamManager:
                     '-'
                 ]
                 
-                logger.info(f"🔧 FFmpeg command: {' '.join(ffmpeg_cmd[:4])}...")
+                logger.info(f"🔧 AUDIO STREAM: FFmpeg command: {' '.join(ffmpeg_cmd[:4])}...")
                 
                 # Start ffmpeg process
                 process = await asyncio.create_subprocess_exec(
@@ -129,11 +140,13 @@ class StreamManager:
                 
                 # Stream to TgCaller using the stdout pipe
                 await tgcaller.play(chat_id, process.stdout)
-                logger.info(f"✅ FFmpeg audio stream started successfully")
+                logger.info(f"✅ AUDIO STREAM: FFmpeg stream started successfully")
                 return True
             
         except Exception as e:
-            logger.error(f"❌ Audio stream error: {e}")
+            logger.error(f"❌ AUDIO STREAM: Error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     async def _start_video_stream(self, chat_id: int, url: str, info: Dict) -> bool:
@@ -240,14 +253,17 @@ class StreamManager:
     async def join_call(self, chat_id: int) -> bool:
         """Join voice chat"""
         try:
+            logger.info(f"📞 JOIN CALL: Attempting to join {chat_id}")
             await tgcaller.join_group_call(chat_id)
-            logger.info(f"✅ Joined call: {chat_id}")
+            logger.info(f"✅ JOIN CALL: Successfully joined {chat_id}")
             return True
         except Exception as e:
             if "already joined" in str(e).lower():
-                logger.info(f"ℹ️ Already in call: {chat_id}")
+                logger.info(f"ℹ️ JOIN CALL: Already in call {chat_id}")
                 return True
-            logger.error(f"❌ Join call error: {e}")
+            logger.error(f"❌ JOIN CALL: Error joining {chat_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     async def leave_call(self, chat_id: int) -> bool:

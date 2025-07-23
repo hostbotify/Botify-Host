@@ -34,6 +34,13 @@ def load_plugins():
         logger.error(f"❌ Plugins directory not found: {plugins_path}")
         return
     
+    # Import the main plugins module to ensure all handlers are registered
+    try:
+        import jhoommusic.plugins
+        logger.info("✅ Main plugins module imported")
+    except Exception as e:
+        logger.error(f"❌ Failed to import main plugins module: {e}")
+    
     # Load command plugins
     commands_path = os.path.join(plugins_path, "commands")
     if os.path.exists(commands_path):

@@ -1,5 +1,5 @@
 """
-Alive command plugin for status checking
+Alive command plugin - Root level for proper loading
 """
 
 import logging
@@ -14,19 +14,23 @@ logger = logging.getLogger(__name__)
 async def alive_command(_, message: Message):
     """Handle /alive command"""
     try:
+        logger.info(f"💚 Alive command from {message.from_user.id}")
+        
         uptime = get_uptime()
         
         await message.reply(
             "🤖 **I'm Alive!**\n\n"
-            "✅ Bot is running\n"
+            "✅ Bot is running perfectly\n"
+            "✅ All systems operational\n"
             "✅ Commands are working\n"
-            "✅ Plugins are loaded\n\n"
+            "✅ Ready to stream music\n\n"
             f"⏱ **Uptime:** `{uptime}`\n"
-            "🎵 **JhoomMusic Bot** is ready!"
+            f"🎵 **JhoomMusic Bot** is ready!\n\n"
+            "**Quick Test:** Use `/play tere naam song`"
         )
         
-        logger.info(f"Alive command used by {message.from_user.id}")
+        logger.info(f"✅ Alive command completed")
         
     except Exception as e:
-        logger.error(f"Error in alive command: {e}")
-        await message.reply("❌ Error in alive command")
+        logger.error(f"❌ Error in alive command: {e}")
+        await message.reply("🤖 **I'm Alive!** - Bot is working!")

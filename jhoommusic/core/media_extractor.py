@@ -46,26 +46,31 @@ class UniversalMediaExtractor:
     async def extract(self, query: str, **kwargs) -> Optional[Union[Dict, List[Dict]]]:
         """Main extraction method with async support"""
         try:
-            logger.info(f"🔍 Extracting: {query}")
+            logger.info(f"🔍 MEDIA EXTRACTOR: Starting extraction for: {query}")
             
             # Detect if it's a URL or search query
             if self._is_url(query):
+                logger.info(f"🔍 MEDIA EXTRACTOR: Detected URL")
                 result = await self._extract_from_url(query, **kwargs)
             else:
+                logger.info(f"🔍 MEDIA EXTRACTOR: Detected search query")
                 result = await self._search_and_extract(query, **kwargs)
             
             if result:
                 if isinstance(result, list):
-                    logger.info(f"✅ Extracted {len(result)} items")
+                    logger.info(f"✅ MEDIA EXTRACTOR: Extracted {len(result)} items")
                 else:
-                    logger.info(f"✅ Extracted: {result.get('title', 'Unknown')}")
+                    logger.info(f"✅ MEDIA EXTRACTOR: Extracted: {result.get('title', 'Unknown')}")
+                    logger.info(f"✅ MEDIA EXTRACTOR: URL: {result.get('url', 'No URL')[:100]}...")
             else:
-                logger.error(f"❌ No results for: {query}")
+                logger.error(f"❌ MEDIA EXTRACTOR: No results for: {query}")
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ Extraction failed for {query}: {e}")
+            logger.error(f"❌ MEDIA EXTRACTOR: Extraction failed for {query}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _is_url(self, text: str) -> bool:
@@ -100,6 +105,9 @@ class UniversalMediaExtractor:
         """Extract using yt-dlp with async support"""
         audio_only = kwargs.get('audio_only', True)
         
+        logger.info(f"🔍 YT-DLP: Starting extraction for: {url[:100]}...")
+        logger.info(f"🔍 YT-DLP: Audio only: {audio_only}")
+        
         ydl_opts = self.base_ydl_opts.copy()
         ydl_opts.update({
             'format': self._get_format_selector(audio_only),
@@ -108,12 +116,15 @@ class UniversalMediaExtractor:
         
         try:
             loop = asyncio.get_event_loop()
+            logger.info(f"🔍 YT-DLP: Running extraction...")
             
             # Run yt-dlp in executor to avoid blocking
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = await loop.run_in_executor(None, ydl.extract_info, url, False)
+                logger.info(f"🔍 YT-DLP: Extraction completed successfully")
                 
                 if 'entries' in info:
+                    logger.info(f"🔍 YT-DLP: Found playlist with {len(info['entries'])} entries")
                     # Playlist
                     tracks = []
                     max_items = kwargs.get('max_playlist', 50)
@@ -122,11 +133,14 @@ class UniversalMediaExtractor:
                             tracks.append(self._format_track_info(entry))
                     return tracks
                 else:
+                    logger.info(f"🔍 YT-DLP: Found single item: {info.get('title', 'Unknown')}")
                     # Single item
                     return self._format_track_info(info)
                     
         except Exception as e:
-            logger.error(f"❌ yt-dlp extraction error: {e}")
+            logger.error(f"❌ YT-DLP: Extraction error: {e}")
+            import traceback
+            traceback.print_exc()
             return await self._fallback_extract(url, **kwargs)
     
     async def _fallback_extract(self, url: str, **kwargs) -> Optional[Dict]:
